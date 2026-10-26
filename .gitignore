@@ -1,0 +1,12 @@
+# private
+.env
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+rsconnect/
+
+# misc
+*.log
+.DS_Store
