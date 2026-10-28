@@ -1,9 +1,6 @@
 # Bioregistration Prototype
 
-A registry for antibody discovery work: proteins, plasmids, sequence components, hybridomas and cell lines, plus their batches and how they connect. Built as a prototype for a biotech that was tracking all of this in Filemaker.
-
-![Protein detail view](docs/protein-detail.png)
-![Analytics](docs/analytics.png)
+A registry for antibody discovery work: proteins, plasmids, sequence components, hybridomas and cell lines, plus their batches and how they connect. Built as a prototype for a biotech that was tracking all of this in FileMaker.
 
 ## What it does
 
@@ -13,7 +10,7 @@ A registry for antibody discovery work: proteins, plasmids, sequence components,
 - Delete a record and its dependents together, with a confirmation that lists what will be removed
 - Analytics: batch concentration and purity over time, yield distribution, internal vs. CRO comparison
 
-## Tools
+## Stack
 
 - R Shiny (UI and server logic)
 - PostgreSQL 16
@@ -66,7 +63,6 @@ server.R            reactive logic and event handlers
 R/                  data access and UI pieces, one file per entity
 schema.sql          tables, constraints, triggers
 seed.sql            demo data
-indexes.sql         foreign key and date indexes
 docker-compose.yml
 Dockerfile
 ```
