@@ -87,6 +87,8 @@ delete_component_cascade <- function(component_id) {
   poolWithTransaction(con, function(conn) {
     dbExecute(conn, "UPDATE protein SET component_id = NULL WHERE component_id = $1",
       params = list(component_id))
+    dbExecute(conn, "DELETE FROM join_table_component_plasmid WHERE component_id = $1",
+      params = list(component_id))
     dbExecute(conn, "DELETE FROM component WHERE component_id = $1",
       params = list(component_id))
   })
