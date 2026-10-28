@@ -2,6 +2,9 @@
 
 A registry for antibody discovery work: proteins, plasmids, sequence components, hybridomas and cell lines, plus their batches and how they connect. Built as a prototype for a biotech that was tracking all of this in FileMaker.
 
+![Protein detail view](docs/catalogue.png)
+![Analytics overview](docs/analytics.png)
+
 ## What it does
 
 - Add, view, edit and delete records across five linked entity types
