@@ -1,6 +1,4 @@
--- ════════════════════════════════════════════════════
--- HYBRIDOMAS
--- ════════════════════════════════════════════════════
+-- hybridomas
 
 INSERT INTO hybridoma (hybridoma_id, clone_name, mouse_igg_subclass,
                         light_chain_subclass, project_code, seq_cro,
@@ -19,9 +17,7 @@ VALUES
    'BALB/c', 'CRO-GS-008', 'spleen', 'ELN-2024-0051',
    'HER2 binder, needs humanization', 'admin');
 
--- ════════════════════════════════════════════════════
--- COMPONENTS
--- ════════════════════════════════════════════════════
+-- components
 
 INSERT INTO component (component_id, hybridoma_id, subclass, type,
                         species, aa_sequence, component_name, mutation,
@@ -47,7 +43,7 @@ VALUES
    NULL, NULL, 'GenScript', NULL, 'ELN-2024-0103', 'SEQ-VK-CD19-01',
    'PRJ-001', 'VK1', 'Sanger', 'IGKV1-39', 'Mammalian', 'admin'),
 
-  ('C-0000003', 'H-0000003', 'lambda', 'Heavy chain variable',
+  ('C-0000003', 'H-0000003', 'IgG1', 'Heavy chain variable',
    'Human', 'QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYWMHWVRQAPGQGLEWMGEINPSNGRTNYNEKFKSRVTMTRDTSTSTVYMELSSLRSEDTAVYYCARGGYYYGSGSYYFDYWGQGTLVTVSS',
    'PD1-VH-01', 'S52A', NULL, 'Q5XXX3', NULL,
    'Affinity-matured variant', 'CAGGTGCAGCTGGTGCAGTCT',
@@ -63,9 +59,7 @@ VALUES
    NULL, NULL, 'GenScript', NULL, 'ELN-2024-0301', 'SEQ-VK-HER2-01',
    'PRJ-003', 'VK3', 'Sanger', 'IGKV3-20', 'Mammalian', 'admin');
 
--- ════════════════════════════════════════════════════
--- PLASMIDS (columns verified against actual schema)
--- ════════════════════════════════════════════════════
+-- plasmids
 
 INSERT INTO plasmid (gf2_dna_sequence, orf_species, orf, basic,
                       codon_cai, plasmid_barcode_path, plasmid_id,
@@ -85,7 +79,7 @@ VALUES
    'ELN-2024-0150', 'Ampicillin', 'pHC-CD19', 'pNR-1001', 'PRJ-001',
    'pcDNA3.1+', 'Ampicillin', 'HC-CD19', NULL, 'R201', 'Freezer-3',
    'B', '2', '14', 'A4', NULL, NULL, 'GF-VH-001', 'GenScript',
-   'CD33', NULL),
+   NULL, NULL),
 
   (NULL, 'Human', NULL, 'pUC-derived', '0.79', NULL,
    'P-0000002', 'admin', 'pNR-CD19-LC', 'pcDNA3.1', NULL,
@@ -114,9 +108,7 @@ VALUES
    'HC-PD1-hole', 'R201', 'Freezer-3', 'C', '1', '20', 'A1', NULL,
    NULL, 'GF-VH-001', 'GenScript', 'GF-VH-002', NULL);
 
--- ════════════════════════════════════════════════════
--- PROTEINS
--- ════════════════════════════════════════════════════
+-- proteins
 
 INSERT INTO protein (protein_id, protein_name, clone_id, component_id,
                       cro_id, nbl_id, reference_name, vendor,
@@ -156,9 +148,7 @@ VALUES
    'Knobs-into-holes bispecific, early stage', '7.9', '1.36',
    '149800', 'HEK293', 'admin');
 
--- ════════════════════════════════════════════════════
--- PROTEIN BATCHES
--- ════════════════════════════════════════════════════
+-- protein batches
 
 INSERT INTO protein_batch (modified_by, batch_id, concentration,
                             buffer_solution, yield_mg, source, unit,
@@ -245,9 +235,7 @@ VALUES
    '149800', '7.9', NULL, '3', '2', '2x3mL', '79', 'P-0000004',
    '2025-04-27', NULL, 'admin', 'B-0000005');
 
--- ════════════════════════════════════════════════════
--- PLASMID BATCHES
--- ════════════════════════════════════════════════════
+-- plasmid batches
 
 INSERT INTO plasmid_batch (plasmid_id, created_by, modified_by,
                             batch_id, concentration, buffer_solution,
@@ -290,9 +278,7 @@ VALUES
    'pNR-Bispecific-Vector', 5, '500', 1, '6', '4', '3x1.25mL',
    'admin', 'ELN-QC-2010');
 
--- ════════════════════════════════════════════════════
--- CELL LINES
--- ════════════════════════════════════════════════════
+-- cell lines
 
 INSERT INTO cell_line (cell_line_id, cell_line_name, expressed_orf,
                         created_by, parental_cell, vendor,
@@ -329,9 +315,7 @@ VALUES
    NULL, NULL, 'Bispecific co-expression pool', 'BSP-Pool-01', NULL,
    'HEK293', NULL, NULL, NULL);
 
--- ════════════════════════════════════════════════════
--- CELL BATCHES
--- ════════════════════════════════════════════════════
+-- cell batches
 
 INSERT INTO cell_batch (cell_line_id, created_by, modified_by,
                          batch_id, date, cell_density, vials, room,
@@ -354,9 +338,7 @@ VALUES
    'CB-BSP-001', '2025-02-20', '2.2e6 cells/mL', 10, 'LN2 Room',
    'Tank-1', 'Rack-C', 'Box-1', 'HEK293/Bispecific', '4');
 
--- ════════════════════════════════════════════════════
--- JOIN TABLE — PROTEIN ↔ PLASMID
--- ════════════════════════════════════════════════════
+-- links: protein ↔ plasmid
 
 INSERT INTO join_table_protein_plasmid (created_by, protein_id,
                                          protein_name, plasmid_id,
@@ -369,9 +351,7 @@ VALUES
   ('admin', 'B-0000003', 'Anti-PD1 IgG4', 'P-0000003', 'pNR-PD1-HC', 'pNR-1003'),
   ('admin', 'B-0000005', 'CD19xPD1 Bispecific', 'P-0000004', 'pNR-Bispecific-Vector', 'pNR-1004');
 
--- ════════════════════════════════════════════════════
--- JOIN TABLE — COMPONENT ↔ PLASMID
--- ════════════════════════════════════════════════════
+-- links: component ↔ plasmid
 
 INSERT INTO join_table_component_plasmid (component_id, plasmid_id,
                                            component_name, plasmid_name,
@@ -383,9 +363,7 @@ VALUES
   ('C-0000001', 'P-0000004', 'CD19-VH-01', 'pNR-Bispecific-Vector', 'admin', 'pNR-1004'),
   ('C-0000003', 'P-0000004', 'PD1-VH-01', 'pNR-Bispecific-Vector', 'admin', 'pNR-1004');
 
--- ════════════════════════════════════════════════════
--- JOIN TABLE — CELL LINE ↔ PLASMID
--- ════════════════════════════════════════════════════
+-- links: cell line ↔ plasmid
 
 INSERT INTO join_table_cell_line_plasmid (plasmid_id, cell_line_id,
                                            cell_line_name, created_by,
@@ -395,3 +373,33 @@ VALUES
   ('P-0000002', 'L-0000001', 'HEK293/CD19-HC+LC', 'admin', 'pNR-CD19-LC'),
   ('P-0000003', 'L-0000002', 'CHO-K1/PD1-HC', 'admin', 'pNR-PD1-HC'),
   ('P-0000004', 'L-0000003', 'HEK293/Bispecific', 'admin', 'pNR-Bispecific-Vector');
+
+-- generated demo batches
+
+SELECT setseed(0.42);
+
+INSERT INTO protein_batch (batch_id, batch_name, protein_id, protein_name,
+                           concentration, unit, yield_mg, source,
+                           sec_purity, page_purity, endotoxin_eu_mg,
+                           purification_date, created_by)
+SELECT
+  'PB-GEN-' || lpad(g::text, 3, '0'),
+  p.alias || '-G' || g,
+  p.protein_id,
+  p.protein_name,
+  round((0.8 + random() * 2.7)::numeric, 2),
+  'mg/mL',
+  round((8 + random() * 30)::numeric, 1),
+  (ARRAY['Internal', 'CRO-A', 'CRO-B'])[1 + floor(random() * 3)::int],
+  round((88 + random() * 11)::numeric, 1),
+  round((86 + random() * 12)::numeric, 1),
+  round((0.02 + random() * 0.4)::numeric, 2),
+  DATE '2025-01-06' + g * 6,
+  'seed'
+FROM generate_series(1, 48) AS g
+JOIN (
+  SELECT protein_id, protein_name, alias,
+         row_number() OVER (ORDER BY protein_id) AS rn
+  FROM protein
+  WHERE protein_id <> 'B-0000005'
+) p ON p.rn = (g % 4) + 1;

@@ -3,10 +3,11 @@
 # get_component_by_id()             one component for the detail view
 # get_next_component_id()           next C-XXXXXXX id
 # insert_component()                add a component
+# update_component()                edit a component
 # get_plasmids_for_component()      plasmids containing a component
 # delete_component_cascade()        delete a component and its links
 # component_detail_ui()             detail panel with sequences and plasmid portal
-# add_component_modal()             add component form
+# component_modal()                 add or edit component form
 # delete_component_confirm_modal()  confirm before delete
 
 get_components <- function() {
@@ -53,6 +54,26 @@ insert_component <- function(component_name, type, species, subclass,
                     blank_to_na))
 }
 
+update_component <- function(component_id, component_name, type, species,
+                             subclass, hybridoma_id, aa_sequence,
+                             cdna_sequence, mutation, uniprot, parent,
+                             vendor, project_code, germline, expression,
+                             seq_method, note) {
+  dbExecute(con,
+    "UPDATE component
+     SET component_name = $2, type = $3, species = $4, subclass = $5,
+         hybridoma_id = $6, aa_sequence = $7, cdna_sequence = $8,
+         mutation = $9, uniprot = $10, parent = $11, vendor = $12,
+         project_code = $13, germline = $14, expression = $15,
+         seq_method = $16, note = $17
+     WHERE component_id = $1",
+    params = lapply(list(component_id, component_name, type, species,
+                         subclass, hybridoma_id, aa_sequence, cdna_sequence,
+                         mutation, uniprot, parent, vendor, project_code,
+                         germline, expression, seq_method, note),
+                    blank_to_na))
+}
+
 get_plasmids_for_component <- function(component_id) {
   dbGetQuery(con,
     "SELECT pl.plasmid_id, pl.plasmid_name, pl.type, pl.vector, jcp.pnr
@@ -90,7 +111,10 @@ component_detail_ui <- function(component_id) {
       p(strong("Vendor: "), comp$vendor),
       p(strong("Project Code: "), comp$project_code),
       p(strong("Note: "), comp$note),
-      actionButton("delete_component_btn", "Delete Component", class = "btn-danger btn-sm")
+      div(
+        actionButton("edit_component_btn", "Edit Component", class = "btn-primary btn-sm"),
+        actionButton("delete_component_btn", "Delete Component", class = "btn-danger btn-sm")
+      )
     ),
     br(),
 
@@ -111,44 +135,49 @@ component_detail_ui <- function(component_id) {
   )
 }
 
-add_component_modal <- function() {
+component_modal <- function(row = NULL) {
+  editing <- !is.null(row)
+  v <- function(col) form_value(row, col)
   hybridomas <- get_hybridomas()
+
   modalDialog(
-    title = "Add New Component",
+    title = if (editing) "Edit Component" else "Add New Component",
     fluidRow(
-      column(6, textInput("new_comp_name", "Component Name")),
-      column(6, textInput("new_comp_type", "Type"))
+      column(6, textInput("new_comp_name", "Component Name", value = v("component_name"))),
+      column(6, textInput("new_comp_type", "Type", value = v("type")))
     ),
     fluidRow(
-      column(6, textInput("new_comp_species", "Species")),
-      column(6, textInput("new_comp_subclass", "Subclass"))
+      column(6, textInput("new_comp_species", "Species", value = v("species"))),
+      column(6, textInput("new_comp_subclass", "Subclass", value = v("subclass")))
     ),
     fluidRow(
       column(6, selectInput("new_comp_hybridoma_id", "Hybridoma",
         choices = c("None" = "",
                     setNames(hybridomas$hybridoma_id,
-                             paste(hybridomas$hybridoma_id, hybridomas$clone_name))))),
-      column(6, textInput("new_comp_parent", "Parent"))
+                             paste(hybridomas$hybridoma_id, hybridomas$clone_name))),
+        selected = v("hybridoma_id"))),
+      column(6, textInput("new_comp_parent", "Parent", value = v("parent")))
     ),
-    textAreaInput("new_comp_aa_seq", "AA Sequence"),
-    textAreaInput("new_comp_cdna_seq", "cDNA Sequence"),
+    textAreaInput("new_comp_aa_seq", "AA Sequence", value = v("aa_sequence")),
+    textAreaInput("new_comp_cdna_seq", "cDNA Sequence", value = v("cdna_sequence")),
     fluidRow(
-      column(6, textInput("new_comp_mutation", "Mutation")),
-      column(6, textInput("new_comp_uniprot", "Uniprot"))
-    ),
-    fluidRow(
-      column(6, textInput("new_comp_vendor", "Vendor")),
-      column(6, textInput("new_comp_project_code", "Project Code"))
+      column(6, textInput("new_comp_mutation", "Mutation", value = v("mutation"))),
+      column(6, textInput("new_comp_uniprot", "Uniprot", value = v("uniprot")))
     ),
     fluidRow(
-      column(6, textInput("new_comp_germline", "Germline")),
-      column(6, textInput("new_comp_seq_method", "Seq Method"))
+      column(6, textInput("new_comp_vendor", "Vendor", value = v("vendor"))),
+      column(6, textInput("new_comp_project_code", "Project Code", value = v("project_code")))
     ),
-    textInput("new_comp_expression", "Expression"),
-    textAreaInput("new_comp_note", "Note"),
+    fluidRow(
+      column(6, textInput("new_comp_germline", "Germline", value = v("germline"))),
+      column(6, textInput("new_comp_seq_method", "Seq Method", value = v("seq_method")))
+    ),
+    textInput("new_comp_expression", "Expression", value = v("expression")),
+    textAreaInput("new_comp_note", "Note", value = v("note")),
     footer = tagList(
       modalButton("Cancel"),
-      actionButton("save_component_btn", "Save", class = "btn-primary")
+      actionButton(if (editing) "update_component_btn" else "save_component_btn",
+                   "Save", class = "btn-primary")
     )
   )
 }

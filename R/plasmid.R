@@ -3,12 +3,13 @@
 # get_plasmid_by_id()             one plasmid for the detail view
 # get_next_plasmid_id()           next P-XXXXXXX id
 # insert_plasmid()                add a plasmid
+# update_plasmid()                edit a plasmid
 # delete_plasmid_cascade()        delete a plasmid, its batches and links
 # get_proteins_for_plasmid()      proteins linked to a plasmid
 # get_components_for_plasmid()    components linked to a plasmid
 # get_cell_lines_for_plasmid()    cell lines linked to a plasmid
 # plasmid_detail_ui()             detail panel with batch and link portals
-# add_plasmid_modal()             add plasmid form
+# plasmid_modal()                 add or edit plasmid form
 # delete_plasmid_confirm_modal()  confirm before delete
 
 get_plasmids <- function() {
@@ -58,6 +59,32 @@ insert_plasmid <- function(plasmid_name, type, vector, insert_seq,
                          catalog_number, cro, cro2, gf1, gf2, n_tag, c_tag,
                          eln_number, storage_room, storage_unit, shelf, rack,
                          storage_box, box_coordinate, note, created_by),
+                    blank_to_na))
+}
+
+update_plasmid <- function(plasmid_id, plasmid_name, type, vector, insert_seq,
+                           parent_vector, alias, pnr, project_code,
+                           selection, antibiotic, orf1, orf2,
+                           vector_source, catalog_number, cro,
+                           n_tag, c_tag, eln_number,
+                           storage_room, storage_unit, shelf, rack,
+                           storage_box, box_coordinate, note) {
+  dbExecute(con,
+    "UPDATE plasmid
+     SET plasmid_name = $2, type = $3, vector = $4, insert_seq = $5,
+         parent_vector = $6, alias = $7, pnr = $8, project_code = $9,
+         selection = $10, antibiotic = $11, orf1 = $12, orf2 = $13,
+         vector_source = $14, catalog_number = $15, cro = $16,
+         n_tag = $17, c_tag = $18, eln_number = $19,
+         storage_room = $20, storage_unit = $21, shelf = $22, rack = $23,
+         storage_box = $24, box_coordinate = $25, note = $26
+     WHERE plasmid_id = $1",
+    params = lapply(list(plasmid_id, plasmid_name, type, vector, insert_seq,
+                         parent_vector, alias, pnr, project_code, selection,
+                         antibiotic, orf1, orf2, vector_source, catalog_number,
+                         cro, n_tag, c_tag, eln_number, storage_room,
+                         storage_unit, shelf, rack, storage_box,
+                         box_coordinate, note),
                     blank_to_na))
 }
 
@@ -125,7 +152,10 @@ plasmid_detail_ui <- function(plasmid_id) {
       p(strong("Storage: "), paste(plasmid$storage_room, plasmid$storage_unit,
                                    plasmid$shelf, plasmid$rack, plasmid$storage_box)),
       p(strong("Note: "), plasmid$note),
-      actionButton("delete_plasmid_btn", "Delete Plasmid", class = "btn-danger btn-sm")
+      div(
+        actionButton("edit_plasmid_btn", "Edit Plasmid", class = "btn-primary btn-sm"),
+        actionButton("delete_plasmid_btn", "Delete Plasmid", class = "btn-danger btn-sm")
+      )
     ),
     br(),
 
@@ -167,59 +197,63 @@ plasmid_detail_ui <- function(plasmid_id) {
   )
 }
 
-add_plasmid_modal <- function() {
+plasmid_modal <- function(row = NULL) {
+  editing <- !is.null(row)
+  v <- function(col) form_value(row, col)
+
   modalDialog(
-    title = "Add New Plasmid",
+    title = if (editing) "Edit Plasmid" else "Add New Plasmid",
     fluidRow(
-      column(6, textInput("new_plasmid_name", "Plasmid Name")),
-      column(6, textInput("new_plasmid_type", "Type"))
+      column(6, textInput("new_plasmid_name", "Plasmid Name", value = v("plasmid_name"))),
+      column(6, textInput("new_plasmid_type", "Type", value = v("type")))
     ),
     fluidRow(
-      column(6, textInput("new_vector", "Vector")),
-      column(6, textInput("new_insert_seq", "Insert"))
+      column(6, textInput("new_vector", "Vector", value = v("vector"))),
+      column(6, textInput("new_insert_seq", "Insert", value = v("insert_seq")))
     ),
     fluidRow(
-      column(6, textInput("new_parent_vector", "Parent Vector")),
-      column(6, textInput("new_plasmid_alias", "Alias"))
+      column(6, textInput("new_parent_vector", "Parent Vector", value = v("parent_vector"))),
+      column(6, textInput("new_plasmid_alias", "Alias", value = v("alias")))
     ),
     fluidRow(
-      column(6, textInput("new_pnr", "pNR")),
-      column(6, textInput("new_plasmid_project_code", "Project Code"))
+      column(6, textInput("new_pnr", "pNR", value = v("pnr"))),
+      column(6, textInput("new_plasmid_project_code", "Project Code", value = v("project_code")))
     ),
     fluidRow(
-      column(6, textInput("new_selection", "Selection")),
-      column(6, textInput("new_antibiotic", "Antibiotic"))
+      column(6, textInput("new_selection", "Selection", value = v("selection"))),
+      column(6, textInput("new_antibiotic", "Antibiotic", value = v("antibiotic")))
     ),
     fluidRow(
-      column(6, textInput("new_orf1", "ORF1")),
-      column(6, textInput("new_orf2", "ORF2"))
+      column(6, textInput("new_orf1", "ORF1", value = v("orf1"))),
+      column(6, textInput("new_orf2", "ORF2", value = v("orf2")))
     ),
     fluidRow(
-      column(6, textInput("new_vector_source", "Vector Source")),
-      column(6, textInput("new_catalog_number", "Catalog Number"))
+      column(6, textInput("new_vector_source", "Vector Source", value = v("vector_source"))),
+      column(6, textInput("new_catalog_number", "Catalog Number", value = v("catalog_number")))
     ),
     fluidRow(
-      column(6, textInput("new_n_tag", "N-Tag")),
-      column(6, textInput("new_c_tag", "C-Tag"))
+      column(6, textInput("new_n_tag", "N-Tag", value = v("n_tag"))),
+      column(6, textInput("new_c_tag", "C-Tag", value = v("c_tag")))
     ),
     fluidRow(
-      column(6, textInput("new_plasmid_cro", "CRO")),
-      column(6, textInput("new_plasmid_eln", "ELN #"))
+      column(6, textInput("new_plasmid_cro", "CRO", value = v("cro"))),
+      column(6, textInput("new_plasmid_eln", "ELN #", value = v("eln_number")))
     ),
     fluidRow(
-      column(3, textInput("new_storage_room", "Room")),
-      column(3, textInput("new_plasmid_storage_unit", "Unit")),
-      column(3, textInput("new_plasmid_shelf", "Shelf")),
-      column(3, textInput("new_plasmid_rack", "Rack"))
+      column(3, textInput("new_storage_room", "Room", value = v("storage_room"))),
+      column(3, textInput("new_plasmid_storage_unit", "Unit", value = v("storage_unit"))),
+      column(3, textInput("new_plasmid_shelf", "Shelf", value = v("shelf"))),
+      column(3, textInput("new_plasmid_rack", "Rack", value = v("rack")))
     ),
     fluidRow(
-      column(6, textInput("new_plasmid_box", "Box")),
-      column(6, textInput("new_box_coordinate", "Box Coordinate"))
+      column(6, textInput("new_plasmid_box", "Box", value = v("storage_box"))),
+      column(6, textInput("new_box_coordinate", "Box Coordinate", value = v("box_coordinate")))
     ),
-    textAreaInput("new_plasmid_note", "Note"),
+    textAreaInput("new_plasmid_note", "Note", value = v("note")),
     footer = tagList(
       modalButton("Cancel"),
-      actionButton("save_plasmid_btn", "Save", class = "btn-primary")
+      actionButton(if (editing) "update_plasmid_btn" else "save_plasmid_btn",
+                   "Save", class = "btn-primary")
     )
   )
 }

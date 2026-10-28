@@ -3,10 +3,11 @@
 # get_hybridoma_by_id()             one hybridoma for the detail view
 # get_next_hybridoma_id()           next H-XXXXXXX id
 # insert_hybridoma()                add a hybridoma
+# update_hybridoma()                edit a hybridoma
 # delete_hybridoma()                delete a hybridoma, unlink its components
 # get_components_for_hybridoma()    components derived from a hybridoma
 # hybridoma_detail_ui()             detail panel with components portal
-# add_hybridoma_modal()             add hybridoma form
+# hybridoma_modal()                 add or edit hybridoma form
 # delete_hybridoma_confirm_modal()  confirm before delete
 
 get_hybridomas <- function() {
@@ -46,6 +47,21 @@ insert_hybridoma <- function(clone_name, mouse_igg_subclass,
                     blank_to_na))
 }
 
+update_hybridoma <- function(hybridoma_id, clone_name, mouse_igg_subclass,
+                             light_chain_subclass, project_code,
+                             seq_cro, strain, cro_id, tissue, eln, note) {
+  dbExecute(con,
+    "UPDATE hybridoma
+     SET clone_name = $2, mouse_igg_subclass = $3, light_chain_subclass = $4,
+         project_code = $5, seq_cro = $6, strain = $7, cro_id = $8,
+         tissue = $9, eln = $10, note = $11
+     WHERE hybridoma_id = $1",
+    params = lapply(list(hybridoma_id, clone_name, mouse_igg_subclass,
+                         light_chain_subclass, project_code, seq_cro, strain,
+                         cro_id, tissue, eln, note),
+                    blank_to_na))
+}
+
 delete_hybridoma <- function(hybridoma_id) {
   poolWithTransaction(con, function(conn) {
     dbExecute(conn, "UPDATE component SET hybridoma_id = NULL WHERE hybridoma_id = $1",
@@ -80,7 +96,10 @@ hybridoma_detail_ui <- function(hybridoma_id) {
       p(strong("Project Code: "), hyb$project_code),
       p(strong("ELN: "), hyb$eln),
       p(strong("Note: "), hyb$note),
-      actionButton("delete_hybridoma_btn", "Delete Hybridoma", class = "btn-danger btn-sm")
+      div(
+        actionButton("edit_hybridoma_btn", "Edit Hybridoma", class = "btn-primary btn-sm"),
+        actionButton("delete_hybridoma_btn", "Delete Hybridoma", class = "btn-danger btn-sm")
+      )
     ),
     br(),
 
@@ -92,30 +111,34 @@ hybridoma_detail_ui <- function(hybridoma_id) {
   )
 }
 
-add_hybridoma_modal <- function() {
+hybridoma_modal <- function(row = NULL) {
+  editing <- !is.null(row)
+  v <- function(col) form_value(row, col)
+
   modalDialog(
-    title = "Add New Hybridoma",
+    title = if (editing) "Edit Hybridoma" else "Add New Hybridoma",
     fluidRow(
-      column(6, textInput("new_hyb_clone_name", "Clone Name")),
-      column(6, textInput("new_hyb_subclass", "Mouse IgG Subclass"))
+      column(6, textInput("new_hyb_clone_name", "Clone Name", value = v("clone_name"))),
+      column(6, textInput("new_hyb_subclass", "Mouse IgG Subclass", value = v("mouse_igg_subclass")))
     ),
     fluidRow(
-      column(6, textInput("new_hyb_lc_subclass", "Light Chain Subclass")),
-      column(6, textInput("new_hyb_project_code", "Project Code"))
+      column(6, textInput("new_hyb_lc_subclass", "Light Chain Subclass", value = v("light_chain_subclass"))),
+      column(6, textInput("new_hyb_project_code", "Project Code", value = v("project_code")))
     ),
     fluidRow(
-      column(6, textInput("new_hyb_seq_cro", "Seq CRO")),
-      column(6, textInput("new_hyb_strain", "Strain"))
+      column(6, textInput("new_hyb_seq_cro", "Seq CRO", value = v("seq_cro"))),
+      column(6, textInput("new_hyb_strain", "Strain", value = v("strain")))
     ),
     fluidRow(
-      column(6, textInput("new_hyb_cro_id", "CRO ID")),
-      column(6, textInput("new_hyb_tissue", "Tissue"))
+      column(6, textInput("new_hyb_cro_id", "CRO ID", value = v("cro_id"))),
+      column(6, textInput("new_hyb_tissue", "Tissue", value = v("tissue")))
     ),
-    textInput("new_hyb_eln", "ELN"),
-    textAreaInput("new_hyb_note", "Note"),
+    textInput("new_hyb_eln", "ELN", value = v("eln")),
+    textAreaInput("new_hyb_note", "Note", value = v("note")),
     footer = tagList(
       modalButton("Cancel"),
-      actionButton("save_hybridoma_btn", "Save", class = "btn-primary")
+      actionButton(if (editing) "update_hybridoma_btn" else "save_hybridoma_btn",
+                   "Save", class = "btn-primary")
     )
   )
 }

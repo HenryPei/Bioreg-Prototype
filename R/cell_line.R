@@ -3,10 +3,11 @@
 # get_cell_line_by_id()             one cell line for the detail view
 # get_next_cell_line_id()           next L-XXXXXXX id
 # insert_cell_line()                add a cell line
+# update_cell_line()                edit a cell line
 # delete_cell_line_cascade()        delete a cell line, its batches and links
 # get_plasmids_for_cell_line()      plasmids linked to a cell line
 # cell_line_detail_ui()             detail panel with batch and plasmid portals
-# add_cell_line_modal()             add cell line form
+# cell_line_modal()                 add or edit cell line form
 # delete_cell_line_confirm_modal()  confirm before delete
 
 get_cell_lines <- function() {
@@ -62,6 +63,32 @@ insert_cell_line <- function(cell_line_name, expressed_orf, cell_type,
                     blank_to_na))
 }
 
+update_cell_line <- function(cell_line_id, cell_line_name, expressed_orf,
+                             cell_type, organism, parental_cell, vendor,
+                             catalog_num, purchase_date, growth_media,
+                             freezing_media, base_cell_line, project_code,
+                             tissue_of_origin, morphology, alias, reporter,
+                             knock_out, knock_in, shrna, dotmatics_id,
+                             eln, note) {
+  dbExecute(con,
+    "UPDATE cell_line
+     SET cell_line_name = $2, expressed_orf = $3, cell_type = $4,
+         organism = $5, parental_cell = $6, vendor = $7, catalog_num = $8,
+         purchase_date = $9, growth_media = $10, freezing_media = $11,
+         base_cell_line = $12, project_code = $13, tissue_of_origin = $14,
+         morphology = $15, alias = $16, reporter = $17, knock_out = $18,
+         knock_in = $19, shrna = $20, dotmatics_id = $21, eln = $22,
+         note = $23
+     WHERE cell_line_id = $1",
+    params = lapply(list(cell_line_id, cell_line_name, expressed_orf,
+                         cell_type, organism, parental_cell, vendor,
+                         catalog_num, purchase_date, growth_media,
+                         freezing_media, base_cell_line, project_code,
+                         tissue_of_origin, morphology, alias, reporter,
+                         knock_out, knock_in, shrna, dotmatics_id, eln, note),
+                    blank_to_na))
+}
+
 delete_cell_line_cascade <- function(cell_line_id) {
   poolWithTransaction(con, function(conn) {
     dbExecute(conn, "DELETE FROM cell_batch WHERE cell_line_id = $1",
@@ -99,7 +126,10 @@ cell_line_detail_ui <- function(cell_line_id) {
       p(strong("Growth Media: "), cl$growth_media),
       p(strong("Project Code: "), cl$project_code),
       p(strong("Note: "), cl$note),
-      actionButton("delete_cell_line_btn", "Delete Cell Line", class = "btn-danger btn-sm")
+      div(
+        actionButton("edit_cell_line_btn", "Edit Cell Line", class = "btn-primary btn-sm"),
+        actionButton("delete_cell_line_btn", "Delete Cell Line", class = "btn-danger btn-sm")
+      )
     ),
     br(),
 
@@ -122,54 +152,59 @@ cell_line_detail_ui <- function(cell_line_id) {
   )
 }
 
-add_cell_line_modal <- function() {
+cell_line_modal <- function(row = NULL) {
+  editing <- !is.null(row)
+  v <- function(col) form_value(row, col)
+  purchase <- if (editing && !is.na(row$purchase_date)) row$purchase_date else NA
+
   modalDialog(
-    title = "Add New Cell Line",
+    title = if (editing) "Edit Cell Line" else "Add New Cell Line",
     fluidRow(
-      column(6, textInput("new_cl_name", "Cell Line Name")),
-      column(6, textInput("new_cl_expressed_orf", "Expressed ORF"))
+      column(6, textInput("new_cl_name", "Cell Line Name", value = v("cell_line_name"))),
+      column(6, textInput("new_cl_expressed_orf", "Expressed ORF", value = v("expressed_orf")))
     ),
     fluidRow(
-      column(6, textInput("new_cl_cell_type", "Cell Type")),
-      column(6, textInput("new_cl_organism", "Organism"))
+      column(6, textInput("new_cl_cell_type", "Cell Type", value = v("cell_type"))),
+      column(6, textInput("new_cl_organism", "Organism", value = v("organism")))
     ),
     fluidRow(
-      column(6, textInput("new_cl_parental", "Parental Cell")),
-      column(6, textInput("new_cl_base_cell_line", "Base Cell Line"))
+      column(6, textInput("new_cl_parental", "Parental Cell", value = v("parental_cell"))),
+      column(6, textInput("new_cl_base_cell_line", "Base Cell Line", value = v("base_cell_line")))
     ),
     fluidRow(
-      column(6, textInput("new_cl_vendor", "Vendor")),
-      column(6, textInput("new_cl_catalog_num", "Catalog Number"))
+      column(6, textInput("new_cl_vendor", "Vendor", value = v("vendor"))),
+      column(6, textInput("new_cl_catalog_num", "Catalog Number", value = v("catalog_num")))
     ),
     fluidRow(
-      column(6, dateInput("new_cl_purchase_date", "Purchase Date", value = NA)),
-      column(6, textInput("new_cl_growth_media", "Growth Media"))
+      column(6, dateInput("new_cl_purchase_date", "Purchase Date", value = purchase)),
+      column(6, textInput("new_cl_growth_media", "Growth Media", value = v("growth_media")))
     ),
     fluidRow(
-      column(6, textInput("new_cl_freezing_media", "Freezing Media")),
-      column(6, textInput("new_cl_project_code", "Project Code"))
+      column(6, textInput("new_cl_freezing_media", "Freezing Media", value = v("freezing_media"))),
+      column(6, textInput("new_cl_project_code", "Project Code", value = v("project_code")))
     ),
     fluidRow(
-      column(6, textInput("new_cl_tissue_of_origin", "Tissue of Origin")),
-      column(6, textInput("new_cl_morphology", "Morphology"))
+      column(6, textInput("new_cl_tissue_of_origin", "Tissue of Origin", value = v("tissue_of_origin"))),
+      column(6, textInput("new_cl_morphology", "Morphology", value = v("morphology")))
     ),
     fluidRow(
-      column(6, textInput("new_cl_knock_out", "Knock Out")),
-      column(6, textInput("new_cl_knock_in", "Knock In"))
+      column(6, textInput("new_cl_knock_out", "Knock Out", value = v("knock_out"))),
+      column(6, textInput("new_cl_knock_in", "Knock In", value = v("knock_in")))
     ),
     fluidRow(
-      column(6, textInput("new_cl_shrna", "shRNA")),
-      column(6, textInput("new_cl_reporter", "Reporter"))
+      column(6, textInput("new_cl_shrna", "shRNA", value = v("shrna"))),
+      column(6, textInput("new_cl_reporter", "Reporter", value = v("reporter")))
     ),
     fluidRow(
-      column(6, textInput("new_cl_alias", "Alias")),
-      column(6, textInput("new_cl_dotmatics_id", "Dotmatics ID"))
+      column(6, textInput("new_cl_alias", "Alias", value = v("alias"))),
+      column(6, textInput("new_cl_dotmatics_id", "Dotmatics ID", value = v("dotmatics_id")))
     ),
-    textInput("new_cl_eln", "ELN"),
-    textAreaInput("new_cl_note", "Note"),
+    textInput("new_cl_eln", "ELN", value = v("eln")),
+    textAreaInput("new_cl_note", "Note", value = v("note")),
     footer = tagList(
       modalButton("Cancel"),
-      actionButton("save_cell_line_btn", "Save", class = "btn-primary")
+      actionButton(if (editing) "update_cell_line_btn" else "save_cell_line_btn",
+                   "Save", class = "btn-primary")
     )
   )
 }

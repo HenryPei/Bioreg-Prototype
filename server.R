@@ -12,6 +12,16 @@ server <- function(input, output, session) {
   refresh_trigger <- reactiveVal(0)
   refresh <- function() refresh_trigger(refresh_trigger() + 1)
 
+  is_blank <- function(x) is.null(x) || trimws(x) == ""
+
+  saved <- function(ok, msg = NULL) {
+    if (ok) {
+      if (!is.null(msg)) showNotification(msg, type = "message")
+      removeModal()
+      refresh()
+    }
+  }
+
   link_result <- function(rows, what) {
     if (rows == 0) {
       showNotification("Already linked", type = "warning")
@@ -53,6 +63,7 @@ server <- function(input, output, session) {
   })
 
   output$protein_detail <- renderUI({
+    refresh_trigger()
     req(selected_protein())
     protein_detail_ui(selected_protein())
   })
@@ -94,10 +105,10 @@ server <- function(input, output, session) {
     updateNavbarPage(session, "navbar", selected = "Plasmids")
   })
 
-  observeEvent(input$add_protein_btn, { showModal(add_protein_modal()) })
+  observeEvent(input$add_protein_btn, { showModal(protein_modal()) })
 
   observeEvent(input$save_protein_btn, {
-    if (is.null(input$new_protein_name) || trimws(input$new_protein_name) == "") {
+    if (is_blank(input$new_protein_name)) {
       return(showNotification("Protein name is required", type = "error"))
     }
     ok <- safe_db(insert_protein(
@@ -111,10 +122,10 @@ server <- function(input, output, session) {
       cro            = input$new_cro,
       cro_id         = input$new_cro_id,
       nbl_id         = input$new_nbl_id,
-      reference_name = input$new_reference_name,
+      reference_name = NULL,
       vendor         = input$new_vendor,
       catalog_num    = input$new_catalog_num,
-      dotmatics_id   = input$new_dotmatics_id,
+      dotmatics_id   = NULL,
       stoichiometry  = input$new_stoichiometry,
       pi             = input$new_pi,
       a280_1mgml     = input$new_a280,
@@ -123,14 +134,48 @@ server <- function(input, output, session) {
       note           = input$new_protein_note,
       created_by     = "user"
     ))
-    if (ok) { removeModal(); refresh() }
+    saved(ok, "Protein added")
+  })
+
+  observeEvent(input$edit_protein_btn, {
+    req(selected_protein())
+    showModal(protein_modal(get_protein_by_id(selected_protein())))
+  })
+
+  observeEvent(input$update_protein_btn, {
+    req(selected_protein())
+    if (is_blank(input$new_protein_name)) {
+      return(showNotification("Protein name is required", type = "error"))
+    }
+    ok <- safe_db(update_protein(
+      protein_id    = selected_protein(),
+      protein_name  = input$new_protein_name,
+      clone_id      = input$new_clone_id,
+      type          = input$new_type,
+      hc_type       = input$new_hc_type,
+      lc_type       = input$new_lc_type,
+      alias         = input$new_alias,
+      project_code  = input$new_project_code,
+      cro           = input$new_cro,
+      cro_id        = input$new_cro_id,
+      nbl_id        = input$new_nbl_id,
+      vendor        = input$new_vendor,
+      catalog_num   = input$new_catalog_num,
+      stoichiometry = input$new_stoichiometry,
+      pi            = input$new_pi,
+      a280_1mgml    = input$new_a280,
+      mw            = input$new_mw,
+      source_cell   = input$new_source_cell,
+      note          = input$new_protein_note
+    ))
+    saved(ok, "Protein updated")
   })
 
   observeEvent(input$add_protein_batch_btn, { showModal(add_protein_batch_modal()) })
 
   observeEvent(input$save_protein_batch_btn, {
     req(selected_protein())
-    if (is.null(input$new_pb_batch_name) || trimws(input$new_pb_batch_name) == "") {
+    if (is_blank(input$new_pb_batch_name)) {
       return(showNotification("Batch name is required", type = "error"))
     }
     if (!is.null(input$new_pb_concentration) &&
@@ -162,7 +207,7 @@ server <- function(input, output, session) {
       note              = input$new_pb_note,
       created_by        = "user"
     ))
-    if (ok) { removeModal(); refresh() }
+    saved(ok, "Batch added")
   })
 
   observeEvent(input$link_plasmid_btn, { showModal(link_plasmid_modal()) })
@@ -220,6 +265,7 @@ server <- function(input, output, session) {
   })
 
   output$plasmid_detail <- renderUI({
+    refresh_trigger()
     req(selected_plasmid())
     plasmid_detail_ui(selected_plasmid())
   })
@@ -368,10 +414,10 @@ server <- function(input, output, session) {
     }
   })
 
-  observeEvent(input$add_plasmid_btn, { showModal(add_plasmid_modal()) })
+  observeEvent(input$add_plasmid_btn, { showModal(plasmid_modal()) })
 
   observeEvent(input$save_plasmid_btn, {
-    if (is.null(input$new_plasmid_name) || trimws(input$new_plasmid_name) == "") {
+    if (is_blank(input$new_plasmid_name)) {
       return(showNotification("Plasmid name is required", type = "error"))
     }
     ok <- safe_db(insert_plasmid(
@@ -405,14 +451,55 @@ server <- function(input, output, session) {
       note           = input$new_plasmid_note,
       created_by     = "user"
     ))
-    if (ok) { removeModal(); refresh() }
+    saved(ok, "Plasmid added")
+  })
+
+  observeEvent(input$edit_plasmid_btn, {
+    req(selected_plasmid())
+    showModal(plasmid_modal(get_plasmid_by_id(selected_plasmid())))
+  })
+
+  observeEvent(input$update_plasmid_btn, {
+    req(selected_plasmid())
+    if (is_blank(input$new_plasmid_name)) {
+      return(showNotification("Plasmid name is required", type = "error"))
+    }
+    ok <- safe_db(update_plasmid(
+      plasmid_id     = selected_plasmid(),
+      plasmid_name   = input$new_plasmid_name,
+      type           = input$new_plasmid_type,
+      vector         = input$new_vector,
+      insert_seq     = input$new_insert_seq,
+      parent_vector  = input$new_parent_vector,
+      alias          = input$new_plasmid_alias,
+      pnr            = input$new_pnr,
+      project_code   = input$new_plasmid_project_code,
+      selection      = input$new_selection,
+      antibiotic     = input$new_antibiotic,
+      orf1           = input$new_orf1,
+      orf2           = input$new_orf2,
+      vector_source  = input$new_vector_source,
+      catalog_number = input$new_catalog_number,
+      cro            = input$new_plasmid_cro,
+      n_tag          = input$new_n_tag,
+      c_tag          = input$new_c_tag,
+      eln_number     = input$new_plasmid_eln,
+      storage_room   = input$new_storage_room,
+      storage_unit   = input$new_plasmid_storage_unit,
+      shelf          = input$new_plasmid_shelf,
+      rack           = input$new_plasmid_rack,
+      storage_box    = input$new_plasmid_box,
+      box_coordinate = input$new_box_coordinate,
+      note           = input$new_plasmid_note
+    ))
+    saved(ok, "Plasmid updated")
   })
 
   observeEvent(input$add_plasmid_batch_btn, { showModal(add_plasmid_batch_modal()) })
 
   observeEvent(input$save_plasmid_batch_btn, {
     req(selected_plasmid())
-    if (is.null(input$new_plb_batch_name) || trimws(input$new_plb_batch_name) == "") {
+    if (is_blank(input$new_plb_batch_name)) {
       return(showNotification("Batch name is required", type = "error"))
     }
     if (!is.null(input$new_plb_concentration) &&
@@ -452,7 +539,7 @@ server <- function(input, output, session) {
       note               = input$new_plb_note,
       created_by         = "user"
     ))
-    if (ok) { removeModal(); refresh() }
+    saved(ok, "Batch added")
   })
 
   observeEvent(input$delete_plasmid_btn, {
@@ -477,11 +564,13 @@ server <- function(input, output, session) {
   })
 
   selected_component_row <- reactive({
+    refresh_trigger()
     req(selected_component())
     get_component_by_id(selected_component())
   })
 
   output$component_detail <- renderUI({
+    refresh_trigger()
     req(selected_component())
     component_detail_ui(selected_component())
   })
@@ -498,10 +587,10 @@ server <- function(input, output, session) {
     updateNavbarPage(session, "navbar", selected = "Plasmids")
   })
 
-  observeEvent(input$add_component_btn, { showModal(add_component_modal()) })
+  observeEvent(input$add_component_btn, { showModal(component_modal()) })
 
   observeEvent(input$save_component_btn, {
-    if (is.null(input$new_comp_name) || trimws(input$new_comp_name) == "") {
+    if (is_blank(input$new_comp_name)) {
       return(showNotification("Component name is required", type = "error"))
     }
     ok <- safe_db(insert_component(
@@ -523,7 +612,39 @@ server <- function(input, output, session) {
       note           = input$new_comp_note,
       created_by     = "user"
     ))
-    if (ok) { removeModal(); refresh() }
+    saved(ok, "Component added")
+  })
+
+  observeEvent(input$edit_component_btn, {
+    req(selected_component())
+    showModal(component_modal(get_component_by_id(selected_component())))
+  })
+
+  observeEvent(input$update_component_btn, {
+    req(selected_component())
+    if (is_blank(input$new_comp_name)) {
+      return(showNotification("Component name is required", type = "error"))
+    }
+    ok <- safe_db(update_component(
+      component_id   = selected_component(),
+      component_name = input$new_comp_name,
+      type           = input$new_comp_type,
+      species        = input$new_comp_species,
+      subclass       = input$new_comp_subclass,
+      hybridoma_id   = input$new_comp_hybridoma_id,
+      aa_sequence    = input$new_comp_aa_seq,
+      cdna_sequence  = input$new_comp_cdna_seq,
+      mutation       = input$new_comp_mutation,
+      uniprot        = input$new_comp_uniprot,
+      parent         = input$new_comp_parent,
+      vendor         = input$new_comp_vendor,
+      project_code   = input$new_comp_project_code,
+      germline       = input$new_comp_germline,
+      expression     = input$new_comp_expression,
+      seq_method     = input$new_comp_seq_method,
+      note           = input$new_comp_note
+    ))
+    saved(ok, "Component updated")
   })
 
   observeEvent(input$delete_component_btn, {
@@ -548,6 +669,7 @@ server <- function(input, output, session) {
   })
 
   output$hybridoma_detail <- renderUI({
+    refresh_trigger()
     req(selected_hybridoma())
     hybridoma_detail_ui(selected_hybridoma())
   })
@@ -561,10 +683,10 @@ server <- function(input, output, session) {
     updateNavbarPage(session, "navbar", selected = "Components")
   })
 
-  observeEvent(input$add_hybridoma_btn, { showModal(add_hybridoma_modal()) })
+  observeEvent(input$add_hybridoma_btn, { showModal(hybridoma_modal()) })
 
   observeEvent(input$save_hybridoma_btn, {
-    if (is.null(input$new_hyb_clone_name) || trimws(input$new_hyb_clone_name) == "") {
+    if (is_blank(input$new_hyb_clone_name)) {
       return(showNotification("Clone name is required", type = "error"))
     }
     ok <- safe_db(insert_hybridoma(
@@ -580,7 +702,33 @@ server <- function(input, output, session) {
       note                 = input$new_hyb_note,
       created_by           = "user"
     ))
-    if (ok) { removeModal(); refresh() }
+    saved(ok, "Hybridoma added")
+  })
+
+  observeEvent(input$edit_hybridoma_btn, {
+    req(selected_hybridoma())
+    showModal(hybridoma_modal(get_hybridoma_by_id(selected_hybridoma())))
+  })
+
+  observeEvent(input$update_hybridoma_btn, {
+    req(selected_hybridoma())
+    if (is_blank(input$new_hyb_clone_name)) {
+      return(showNotification("Clone name is required", type = "error"))
+    }
+    ok <- safe_db(update_hybridoma(
+      hybridoma_id         = selected_hybridoma(),
+      clone_name           = input$new_hyb_clone_name,
+      mouse_igg_subclass   = input$new_hyb_subclass,
+      light_chain_subclass = input$new_hyb_lc_subclass,
+      project_code         = input$new_hyb_project_code,
+      seq_cro              = input$new_hyb_seq_cro,
+      strain               = input$new_hyb_strain,
+      cro_id               = input$new_hyb_cro_id,
+      tissue               = input$new_hyb_tissue,
+      eln                  = input$new_hyb_eln,
+      note                 = input$new_hyb_note
+    ))
+    saved(ok, "Hybridoma updated")
   })
 
   observeEvent(input$delete_hybridoma_btn, {
@@ -608,6 +756,7 @@ server <- function(input, output, session) {
   })
 
   output$cell_line_detail <- renderUI({
+    refresh_trigger()
     req(selected_cell_line())
     cell_line_detail_ui(selected_cell_line())
   })
@@ -659,10 +808,10 @@ server <- function(input, output, session) {
     }
   })
 
-  observeEvent(input$add_cell_line_btn, { showModal(add_cell_line_modal()) })
+  observeEvent(input$add_cell_line_btn, { showModal(cell_line_modal()) })
 
   observeEvent(input$save_cell_line_btn, {
-    if (is.null(input$new_cl_name) || trimws(input$new_cl_name) == "") {
+    if (is_blank(input$new_cl_name)) {
       return(showNotification("Cell line name is required", type = "error"))
     }
     ok <- safe_db(insert_cell_line(
@@ -695,14 +844,52 @@ server <- function(input, output, session) {
       note               = input$new_cl_note,
       created_by         = "user"
     ))
-    if (ok) { removeModal(); refresh() }
+    saved(ok, "Cell line added")
+  })
+
+  observeEvent(input$edit_cell_line_btn, {
+    req(selected_cell_line())
+    showModal(cell_line_modal(get_cell_line_by_id(selected_cell_line())))
+  })
+
+  observeEvent(input$update_cell_line_btn, {
+    req(selected_cell_line())
+    if (is_blank(input$new_cl_name)) {
+      return(showNotification("Cell line name is required", type = "error"))
+    }
+    ok <- safe_db(update_cell_line(
+      cell_line_id     = selected_cell_line(),
+      cell_line_name   = input$new_cl_name,
+      expressed_orf    = input$new_cl_expressed_orf,
+      cell_type        = input$new_cl_cell_type,
+      organism         = input$new_cl_organism,
+      parental_cell    = input$new_cl_parental,
+      vendor           = input$new_cl_vendor,
+      catalog_num      = input$new_cl_catalog_num,
+      purchase_date    = input$new_cl_purchase_date,
+      growth_media     = input$new_cl_growth_media,
+      freezing_media   = input$new_cl_freezing_media,
+      base_cell_line   = input$new_cl_base_cell_line,
+      project_code     = input$new_cl_project_code,
+      tissue_of_origin = input$new_cl_tissue_of_origin,
+      morphology       = input$new_cl_morphology,
+      alias            = input$new_cl_alias,
+      reporter         = input$new_cl_reporter,
+      knock_out        = input$new_cl_knock_out,
+      knock_in         = input$new_cl_knock_in,
+      shrna            = input$new_cl_shrna,
+      dotmatics_id     = input$new_cl_dotmatics_id,
+      eln              = input$new_cl_eln,
+      note             = input$new_cl_note
+    ))
+    saved(ok, "Cell line updated")
   })
 
   observeEvent(input$add_cell_batch_btn, { showModal(add_cell_batch_modal()) })
 
   observeEvent(input$save_cell_batch_btn, {
     req(selected_cell_line())
-    if (is.null(input$new_cb_batch_id) || trimws(input$new_cb_batch_id) == "") {
+    if (is_blank(input$new_cb_batch_id)) {
       return(showNotification("Batch ID is required", type = "error"))
     }
     if (!is.null(input$new_cb_vials) &&
@@ -722,7 +909,7 @@ server <- function(input, output, session) {
       passage_num  = input$new_cb_passage_num,
       created_by   = "user"
     ))
-    if (ok) { removeModal(); refresh() }
+    saved(ok, "Batch added")
   })
 
   observeEvent(input$delete_cell_line_btn, {

@@ -3,6 +3,7 @@
 # safe_db()                       run a db write, show errors instead of crashing
 # selected_value()                get an id from the selected table row
 # blank_to_na()                   turn empty inputs into NA
+# form_value()                    a row's field as form text, "" if empty
 
 format_relationship_list <- function(names, max_show = 5) {
   if (length(names) == 0) return("")
@@ -31,4 +32,8 @@ selected_value <- function(data, rows, col) {
 
 blank_to_na <- function(x) {
   if (is.null(x) || length(x) == 0 || is.na(x) || trimws(x) == "") NA else x
+}
+
+form_value <- function(row, col) {
+  if (is.null(row) || is.null(row[[col]] || is.na(row[[col]]))) "" else as.character(row[[col]])
 }

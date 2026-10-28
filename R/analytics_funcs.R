@@ -116,7 +116,7 @@ plot_yield_distribution <- function(protein_id = NULL) {
 
 plot_batch_count <- function() {
   data <- dbGetQuery(con,
-    "SELECT p.protein_name, COUNT(pb.primary_key) AS batch_count
+    "SELECT p.protein_name, COUNT(pb.primary_key)::int AS batch_count
      FROM protein p
      LEFT JOIN protein_batch pb ON p.protein_id = pb.protein_id
      GROUP BY p.protein_id, p.protein_name
@@ -138,7 +138,7 @@ plot_source_comparison <- function() {
     "SELECT source,
             AVG(concentration) AS avg_concentration,
             AVG(sec_purity) AS avg_purity,
-            COUNT(*) AS batch_count
+            COUNT(*)::int AS batch_count
      FROM protein_batch
      WHERE source IS NOT NULL
      GROUP BY source")
@@ -159,10 +159,10 @@ plot_source_comparison <- function() {
 
 get_overview_stats <- function() {
   list(
-    total_proteins    = dbGetQuery(con, "SELECT COUNT(*) FROM protein")[[1]],
-    total_batches     = dbGetQuery(con, "SELECT COUNT(*) FROM protein_batch")[[1]],
-    total_plasmids    = dbGetQuery(con, "SELECT COUNT(*) FROM plasmid")[[1]],
-    total_cell_lines  = dbGetQuery(con, "SELECT COUNT(*) FROM cell_line")[[1]],
+    total_proteins    = dbGetQuery(con, "SELECT COUNT(*)::int FROM protein")[[1]],
+    total_batches     = dbGetQuery(con, "SELECT COUNT(*)::int FROM protein_batch")[[1]],
+    total_plasmids    = dbGetQuery(con, "SELECT COUNT(*)::int FROM plasmid")[[1]],
+    total_cell_lines  = dbGetQuery(con, "SELECT COUNT(*)::int FROM cell_line")[[1]],
     avg_concentration = dbGetQuery(con,
       "SELECT ROUND(AVG(concentration), 2) FROM protein_batch")[[1]],
     avg_purity        = dbGetQuery(con,
