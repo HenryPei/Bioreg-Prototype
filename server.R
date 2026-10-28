@@ -1,6 +1,5 @@
 server <- function(input, output, session) {
 
-  # ── Navigation state ───────────────────────────────
   selected_protein   <- reactiveVal(NULL)
   selected_pb        <- reactiveVal(NULL)
   selected_plasmid   <- reactiveVal(NULL)
@@ -9,33 +8,46 @@ server <- function(input, output, session) {
   selected_hybridoma <- reactiveVal(NULL)
   selected_cell_line <- reactiveVal(NULL)
   selected_cb        <- reactiveVal(NULL)
-  active_chart       <- reactiveVal("concentration_trend")
 
   refresh_trigger <- reactiveVal(0)
+  refresh <- function() refresh_trigger(refresh_trigger() + 1)
 
-  # ── Populate filter dropdowns ──────────────────────
-  observe({
-    refresh_trigger()
-    proteins <- get_proteins()
-    updateSelectInput(session, "analytics_protein_filter",
-      choices = c("All" = "all",
-        setNames(proteins$protein_id, proteins$protein_name)))
-  })
+  link_result <- function(rows, what) {
+    if (rows == 0) {
+      showNotification("Already linked", type = "warning")
+    } else {
+      showNotification(paste(what, "linked"), type = "message")
+      removeModal()
+      refresh()
+    }
+  }
 
-  # ══════════════════════════════════════════════════
-  # PROTEINS
-  # ══════════════════════════════════════════════════
+  proteins_data   <- reactive({ refresh_trigger(); get_proteins() })
+  plasmids_data   <- reactive({ refresh_trigger(); get_plasmids() })
+  components_data <- reactive({ refresh_trigger(); get_components() })
+  hybridomas_data <- reactive({ refresh_trigger(); get_hybridomas() })
+  cell_lines_data <- reactive({ refresh_trigger(); get_cell_lines() })
 
-  output$proteins_table <- renderDT({
-    refresh_trigger()
-    get_proteins()
-  }, selection = "single", rownames = FALSE)
+  protein_batches_data  <- reactive({ refresh_trigger(); req(selected_protein()); get_protein_batches(selected_protein()) })
+  protein_plasmids_data <- reactive({ refresh_trigger(); req(selected_protein()); get_plasmids_for_protein(selected_protein()) })
+
+  plasmid_batches_data    <- reactive({ refresh_trigger(); req(selected_plasmid()); get_plasmid_batches(selected_plasmid()) })
+  plasmid_proteins_data   <- reactive({ refresh_trigger(); req(selected_plasmid()); get_proteins_for_plasmid(selected_plasmid()) })
+  plasmid_components_data <- reactive({ refresh_trigger(); req(selected_plasmid()); get_components_for_plasmid(selected_plasmid()) })
+  plasmid_cell_lines_data <- reactive({ refresh_trigger(); req(selected_plasmid()); get_cell_lines_for_plasmid(selected_plasmid()) })
+
+  component_plasmids_data   <- reactive({ refresh_trigger(); req(selected_component()); get_plasmids_for_component(selected_component()) })
+  hybridoma_components_data <- reactive({ refresh_trigger(); req(selected_hybridoma()); get_components_for_hybridoma(selected_hybridoma()) })
+
+  cell_batches_data       <- reactive({ refresh_trigger(); req(selected_cell_line()); get_cell_batches(selected_cell_line()) })
+  cell_line_plasmids_data <- reactive({ refresh_trigger(); req(selected_cell_line()); get_plasmids_for_cell_line(selected_cell_line()) })
+
+  output$proteins_table <- renderDT(proteins_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$proteins_table_rows_selected, {
-    rows <- input$proteins_table_rows_selected
-    if (length(rows)) {
-      data <- get_proteins()
-      selected_protein(data$protein_id[rows])
+    id <- selected_value(proteins_data(), input$proteins_table_rows_selected, "protein_id")
+    if (!is.null(id)) {
+      selected_protein(id)
       selected_pb(NULL)
     }
   })
@@ -45,18 +57,11 @@ server <- function(input, output, session) {
     protein_detail_ui(selected_protein())
   })
 
-  output$protein_batches_portal <- renderDT({
-    refresh_trigger()
-    req(selected_protein())
-    get_protein_batches(selected_protein())
-  }, selection = "single", rownames = FALSE)
+  output$protein_batches_portal <- renderDT(protein_batches_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$protein_batches_portal_rows_selected, {
-    rows <- input$protein_batches_portal_rows_selected
-    if (length(rows)) {
-      batches <- get_protein_batches(selected_protein())
-      selected_pb(batches$primary_key[rows])
-    }
+    id <- selected_value(protein_batches_data(), input$protein_batches_portal_rows_selected, "primary_key")
+    if (!is.null(id)) selected_pb(id)
   })
 
   output$protein_batch_detail <- renderUI({
@@ -64,9 +69,7 @@ server <- function(input, output, session) {
     protein_batch_detail_ui(selected_pb())
   })
 
-  observeEvent(input$back_to_protein_btn, {
-    selected_pb(NULL)
-  })
+  observeEvent(input$back_to_protein_btn, { selected_pb(NULL) })
 
   observeEvent(input$delete_protein_batch_btn, {
     req(selected_pb())
@@ -74,41 +77,30 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$confirm_delete_protein_batch_btn, {
-    delete_protein_batch(selected_pb())
-    selected_pb(NULL)
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
-  })
-
-  # ── Protein plasmids portal — selection only, no auto-navigate ──
-  output$protein_plasmids_portal <- renderDT({
-    refresh_trigger()
-    req(selected_protein())
-    get_plasmids_for_protein(selected_protein())
-  }, selection = "single", rownames = FALSE)
-
-  observeEvent(input$view_plasmid_btn, {
-    req(selected_protein())
-    rows <- input$protein_plasmids_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_plasmids_for_protein(selected_protein())
-      selected_plasmid(linked$plasmid_id[rows])
-      updateNavbarPage(session, "navbar", selected = "Plasmids")
-    } else {
-      showNotification("Select a plasmid first", type = "warning")
+    if (safe_db(delete_protein_batch(selected_pb()))) {
+      showNotification("Batch deleted", type = "message")
+      selected_pb(NULL)
+      removeModal()
+      refresh()
     }
   })
 
-  observeEvent(input$add_protein_btn, {
-    showModal(add_protein_modal())
+  output$protein_plasmids_portal <- renderDT(protein_plasmids_data(), selection = "single", rownames = FALSE)
+
+  observeEvent(input$view_plasmid_btn, {
+    id <- selected_value(protein_plasmids_data(), input$protein_plasmids_portal_rows_selected, "plasmid_id")
+    if (is.null(id)) return(showNotification("Select a plasmid first", type = "warning"))
+    selected_plasmid(id)
+    updateNavbarPage(session, "navbar", selected = "Plasmids")
   })
+
+  observeEvent(input$add_protein_btn, { showModal(add_protein_modal()) })
 
   observeEvent(input$save_protein_btn, {
     if (is.null(input$new_protein_name) || trimws(input$new_protein_name) == "") {
-      showNotification("Protein name is required", type = "error")
-      return()
+      return(showNotification("Protein name is required", type = "error"))
     }
-    insert_protein(
+    ok <- safe_db(insert_protein(
       protein_name   = input$new_protein_name,
       clone_id       = input$new_clone_id,
       type           = input$new_type,
@@ -130,27 +122,22 @@ server <- function(input, output, session) {
       source_cell    = input$new_source_cell,
       note           = input$new_protein_note,
       created_by     = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    ))
+    if (ok) { removeModal(); refresh() }
   })
 
-  observeEvent(input$add_protein_batch_btn, {
-    showModal(add_protein_batch_modal())
-  })
+  observeEvent(input$add_protein_batch_btn, { showModal(add_protein_batch_modal()) })
 
   observeEvent(input$save_protein_batch_btn, {
     req(selected_protein())
     if (is.null(input$new_pb_batch_name) || trimws(input$new_pb_batch_name) == "") {
-      showNotification("Batch name is required", type = "error")
-      return()
+      return(showNotification("Batch name is required", type = "error"))
     }
     if (!is.null(input$new_pb_concentration) &&
         !is.na(input$new_pb_concentration) && input$new_pb_concentration < 0) {
-      showNotification("Concentration must be a positive number", type = "error")
-      return()
+      return(showNotification("Concentration must be a positive number", type = "error"))
     }
-    insert_protein_batch(
+    ok <- safe_db(insert_protein_batch(
       protein_id        = selected_protein(),
       batch_id          = input$new_pb_batch_id,
       batch_name        = input$new_pb_batch_name,
@@ -174,40 +161,37 @@ server <- function(input, output, session) {
       qc_eln            = input$new_pb_qc_eln,
       note              = input$new_pb_note,
       created_by        = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    ))
+    if (ok) { removeModal(); refresh() }
   })
 
-  observeEvent(input$link_plasmid_btn, {
-    showModal(link_plasmid_modal())
-  })
+  observeEvent(input$link_plasmid_btn, { showModal(link_plasmid_modal()) })
 
   observeEvent(input$save_plasmid_link_btn, {
     req(selected_protein())
-    plasmid <- get_plasmid_by_id(input$link_plasmid_id)
-    protein <- get_protein_by_id(selected_protein())
-    link_protein_plasmid(
-      protein_id   = selected_protein(),
-      plasmid_id   = input$link_plasmid_id,
-      protein_name = protein$protein_name,
-      plasmid_name = plasmid$plasmid_name,
-      pnr_number   = plasmid$pnr,
-      created_by   = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    rows <- 0
+    ok <- safe_db({
+      plasmid <- get_plasmid_by_id(input$link_plasmid_id)
+      protein <- get_protein_by_id(selected_protein())
+      rows <- link_protein_plasmid(
+        protein_id   = selected_protein(),
+        plasmid_id   = input$link_plasmid_id,
+        protein_name = protein$protein_name,
+        plasmid_name = plasmid$plasmid_name,
+        pnr_number   = plasmid$pnr,
+        created_by   = "user"
+      )
+    })
+    if (ok) link_result(rows, "Plasmid")
   })
 
   observeEvent(input$unlink_plasmid_btn, {
     req(selected_protein())
-    rows <- input$protein_plasmids_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_plasmids_for_protein(selected_protein())
-      unlink_protein_plasmid(selected_protein(), linked$plasmid_id[rows])
-      refresh_trigger(refresh_trigger() + 1)
-    } else {
-      showNotification("Select a plasmid to unlink first", type = "warning")
+    id <- selected_value(protein_plasmids_data(), input$protein_plasmids_portal_rows_selected, "plasmid_id")
+    if (is.null(id)) return(showNotification("Select a plasmid to unlink first", type = "warning"))
+    if (safe_db(unlink_protein_plasmid(selected_protein(), id))) {
+      showNotification("Plasmid unlinked", type = "message")
+      refresh()
     }
   })
 
@@ -217,26 +201,20 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$confirm_delete_protein_btn, {
-    delete_protein_cascade(selected_protein())
-    selected_protein(NULL)
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    if (safe_db(delete_protein_cascade(selected_protein()))) {
+      showNotification("Protein and its batches deleted", type = "message")
+      selected_protein(NULL)
+      removeModal()
+      refresh()
+    }
   })
 
-  # ══════════════════════════════════════════════════
-  # PLASMIDS
-  # ══════════════════════════════════════════════════
-
-  output$plasmids_table <- renderDT({
-    refresh_trigger()
-    get_plasmids()
-  }, selection = "single", rownames = FALSE)
+  output$plasmids_table <- renderDT(plasmids_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$plasmids_table_rows_selected, {
-    rows <- input$plasmids_table_rows_selected
-    if (length(rows)) {
-      data <- get_plasmids()
-      selected_plasmid(data$plasmid_id[rows])
+    id <- selected_value(plasmids_data(), input$plasmids_table_rows_selected, "plasmid_id")
+    if (!is.null(id)) {
+      selected_plasmid(id)
       selected_plb(NULL)
     }
   })
@@ -246,18 +224,11 @@ server <- function(input, output, session) {
     plasmid_detail_ui(selected_plasmid())
   })
 
-  output$plasmid_batches_portal <- renderDT({
-    refresh_trigger()
-    req(selected_plasmid())
-    get_plasmid_batches(selected_plasmid())
-  }, selection = "single", rownames = FALSE)
+  output$plasmid_batches_portal <- renderDT(plasmid_batches_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$plasmid_batches_portal_rows_selected, {
-    rows <- input$plasmid_batches_portal_rows_selected
-    if (length(rows)) {
-      batches <- get_plasmid_batches(selected_plasmid())
-      selected_plb(batches$primary_key[rows])
-    }
+    id <- selected_value(plasmid_batches_data(), input$plasmid_batches_portal_rows_selected, "primary_key")
+    if (!is.null(id)) selected_plb(id)
   })
 
   output$plasmid_batch_detail <- renderUI({
@@ -265,9 +236,7 @@ server <- function(input, output, session) {
     plasmid_batch_detail_ui(selected_plb())
   })
 
-  observeEvent(input$back_to_plasmid_btn, {
-    selected_plb(NULL)
-  })
+  observeEvent(input$back_to_plasmid_btn, { selected_plb(NULL) })
 
   observeEvent(input$delete_plasmid_batch_btn, {
     req(selected_plb())
@@ -275,174 +244,137 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$confirm_delete_plasmid_batch_btn, {
-    delete_plasmid_batch(selected_plb())
-    selected_plb(NULL)
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
-  })
-
-  # ── Proteins portal — selection only, no auto-navigate ──
-  output$plasmid_proteins_portal <- renderDT({
-    refresh_trigger()
-    req(selected_plasmid())
-    get_proteins_for_plasmid(selected_plasmid())
-  }, selection = "single", rownames = FALSE)
-
-  observeEvent(input$view_protein_btn, {
-    req(selected_plasmid())
-    rows <- input$plasmid_proteins_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_proteins_for_plasmid(selected_plasmid())
-      selected_protein(linked$protein_id[rows])
-      updateNavbarPage(session, "navbar", selected = "Proteins")
-    } else {
-      showNotification("Select a protein first", type = "warning")
+    if (safe_db(delete_plasmid_batch(selected_plb()))) {
+      showNotification("Batch deleted", type = "message")
+      selected_plb(NULL)
+      removeModal()
+      refresh()
     }
   })
 
-  observeEvent(input$link_protein_to_plasmid_btn, {
-    showModal(link_protein_modal())
+  output$plasmid_proteins_portal <- renderDT(plasmid_proteins_data(), selection = "single", rownames = FALSE)
+
+  observeEvent(input$view_protein_btn, {
+    id <- selected_value(plasmid_proteins_data(), input$plasmid_proteins_portal_rows_selected, "protein_id")
+    if (is.null(id)) return(showNotification("Select a protein first", type = "warning"))
+    selected_protein(id)
+    updateNavbarPage(session, "navbar", selected = "Proteins")
   })
+
+  observeEvent(input$link_protein_to_plasmid_btn, { showModal(link_protein_modal()) })
 
   observeEvent(input$save_protein_link_btn, {
     req(selected_plasmid())
-    protein <- get_protein_by_id(input$link_protein_id)
-    plasmid <- get_plasmid_by_id(selected_plasmid())
-    link_protein_plasmid(
-      protein_id   = input$link_protein_id,
-      plasmid_id   = selected_plasmid(),
-      protein_name = protein$protein_name,
-      plasmid_name = plasmid$plasmid_name,
-      pnr_number   = plasmid$pnr,
-      created_by   = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    rows <- 0
+    ok <- safe_db({
+      protein <- get_protein_by_id(input$link_protein_id)
+      plasmid <- get_plasmid_by_id(selected_plasmid())
+      rows <- link_protein_plasmid(
+        protein_id   = input$link_protein_id,
+        plasmid_id   = selected_plasmid(),
+        protein_name = protein$protein_name,
+        plasmid_name = plasmid$plasmid_name,
+        pnr_number   = plasmid$pnr,
+        created_by   = "user"
+      )
+    })
+    if (ok) link_result(rows, "Protein")
   })
 
   observeEvent(input$unlink_protein_from_plasmid_btn, {
     req(selected_plasmid())
-    rows <- input$plasmid_proteins_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_proteins_for_plasmid(selected_plasmid())
-      unlink_protein_plasmid(linked$protein_id[rows], selected_plasmid())
-      refresh_trigger(refresh_trigger() + 1)
-    } else {
-      showNotification("Select a protein to unlink first", type = "warning")
+    id <- selected_value(plasmid_proteins_data(), input$plasmid_proteins_portal_rows_selected, "protein_id")
+    if (is.null(id)) return(showNotification("Select a protein to unlink first", type = "warning"))
+    if (safe_db(unlink_protein_plasmid(id, selected_plasmid()))) {
+      showNotification("Protein unlinked", type = "message")
+      refresh()
     }
   })
 
-  # ── Components portal — selection only, no auto-navigate ──
-  output$plasmid_components_portal <- renderDT({
-    refresh_trigger()
-    req(selected_plasmid())
-    get_components_for_plasmid(selected_plasmid())
-  }, selection = "single", rownames = FALSE)
+  output$plasmid_components_portal <- renderDT(plasmid_components_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$view_component_btn, {
-    req(selected_plasmid())
-    rows <- input$plasmid_components_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_components_for_plasmid(selected_plasmid())
-      selected_component(linked$component_id[rows])
-      updateNavbarPage(session, "navbar", selected = "Components")
-    } else {
-      showNotification("Select a component first", type = "warning")
-    }
+    id <- selected_value(plasmid_components_data(), input$plasmid_components_portal_rows_selected, "component_id")
+    if (is.null(id)) return(showNotification("Select a component first", type = "warning"))
+    selected_component(id)
+    updateNavbarPage(session, "navbar", selected = "Components")
   })
 
-  observeEvent(input$link_component_btn, {
-    showModal(link_component_modal())
-  })
+  observeEvent(input$link_component_btn, { showModal(link_component_modal()) })
 
   observeEvent(input$save_component_link_btn, {
     req(selected_plasmid())
-    component <- get_component_by_id(input$link_component_id)
-    plasmid   <- get_plasmid_by_id(selected_plasmid())
-    link_component_plasmid(
-      component_id   = input$link_component_id,
-      plasmid_id     = selected_plasmid(),
-      component_name = component$component_name,
-      plasmid_name   = plasmid$plasmid_name,
-      pnr            = plasmid$pnr,
-      created_by     = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    rows <- 0
+    ok <- safe_db({
+      component <- get_component_by_id(input$link_component_id)
+      plasmid   <- get_plasmid_by_id(selected_plasmid())
+      rows <- link_component_plasmid(
+        component_id   = input$link_component_id,
+        plasmid_id     = selected_plasmid(),
+        component_name = component$component_name,
+        plasmid_name   = plasmid$plasmid_name,
+        pnr            = plasmid$pnr,
+        created_by     = "user"
+      )
+    })
+    if (ok) link_result(rows, "Component")
   })
 
   observeEvent(input$unlink_component_btn, {
     req(selected_plasmid())
-    rows <- input$plasmid_components_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_components_for_plasmid(selected_plasmid())
-      unlink_component_plasmid(linked$component_id[rows], selected_plasmid())
-      refresh_trigger(refresh_trigger() + 1)
-    } else {
-      showNotification("Select a component to unlink first", type = "warning")
+    id <- selected_value(plasmid_components_data(), input$plasmid_components_portal_rows_selected, "component_id")
+    if (is.null(id)) return(showNotification("Select a component to unlink first", type = "warning"))
+    if (safe_db(unlink_component_plasmid(id, selected_plasmid()))) {
+      showNotification("Component unlinked", type = "message")
+      refresh()
     }
   })
 
-  # ── Cell lines portal — selection only, no auto-navigate ──
-  output$plasmid_cell_lines_portal <- renderDT({
-    refresh_trigger()
-    req(selected_plasmid())
-    get_cell_lines_for_plasmid(selected_plasmid())
-  }, selection = "single", rownames = FALSE)
+  output$plasmid_cell_lines_portal <- renderDT(plasmid_cell_lines_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$view_cell_line_btn, {
-    req(selected_plasmid())
-    rows <- input$plasmid_cell_lines_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_cell_lines_for_plasmid(selected_plasmid())
-      selected_cell_line(linked$cell_line_id[rows])
-      updateNavbarPage(session, "navbar", selected = "Cell Lines")
-    } else {
-      showNotification("Select a cell line first", type = "warning")
-    }
+    id <- selected_value(plasmid_cell_lines_data(), input$plasmid_cell_lines_portal_rows_selected, "cell_line_id")
+    if (is.null(id)) return(showNotification("Select a cell line first", type = "warning"))
+    selected_cell_line(id)
+    updateNavbarPage(session, "navbar", selected = "Cell Lines")
   })
 
-  observeEvent(input$link_cell_line_btn, {
-    showModal(link_cell_line_modal())
-  })
+  observeEvent(input$link_cell_line_btn, { showModal(link_cell_line_modal()) })
 
   observeEvent(input$save_cell_line_link_btn, {
     req(selected_plasmid())
-    cl      <- get_cell_line_by_id(input$link_cell_line_id)
-    plasmid <- get_plasmid_by_id(selected_plasmid())
-    link_cell_line_plasmid(
-      cell_line_id   = input$link_cell_line_id,
-      plasmid_id     = selected_plasmid(),
-      cell_line_name = cl$cell_line_name,
-      plasmid_name   = plasmid$plasmid_name,
-      created_by     = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    rows <- 0
+    ok <- safe_db({
+      cl      <- get_cell_line_by_id(input$link_cell_line_id)
+      plasmid <- get_plasmid_by_id(selected_plasmid())
+      rows <- link_cell_line_plasmid(
+        cell_line_id   = input$link_cell_line_id,
+        plasmid_id     = selected_plasmid(),
+        cell_line_name = cl$cell_line_name,
+        plasmid_name   = plasmid$plasmid_name,
+        created_by     = "user"
+      )
+    })
+    if (ok) link_result(rows, "Cell line")
   })
 
   observeEvent(input$unlink_cell_line_btn, {
     req(selected_plasmid())
-    rows <- input$plasmid_cell_lines_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_cell_lines_for_plasmid(selected_plasmid())
-      unlink_cell_line_plasmid(linked$cell_line_id[rows], selected_plasmid())
-      refresh_trigger(refresh_trigger() + 1)
-    } else {
-      showNotification("Select a cell line to unlink first", type = "warning")
+    id <- selected_value(plasmid_cell_lines_data(), input$plasmid_cell_lines_portal_rows_selected, "cell_line_id")
+    if (is.null(id)) return(showNotification("Select a cell line to unlink first", type = "warning"))
+    if (safe_db(unlink_cell_line_plasmid(id, selected_plasmid()))) {
+      showNotification("Cell line unlinked", type = "message")
+      refresh()
     }
   })
 
-  observeEvent(input$add_plasmid_btn, {
-    showModal(add_plasmid_modal())
-  })
+  observeEvent(input$add_plasmid_btn, { showModal(add_plasmid_modal()) })
 
   observeEvent(input$save_plasmid_btn, {
     if (is.null(input$new_plasmid_name) || trimws(input$new_plasmid_name) == "") {
-      showNotification("Plasmid name is required", type = "error")
-      return()
+      return(showNotification("Plasmid name is required", type = "error"))
     }
-    insert_plasmid(
+    ok <- safe_db(insert_plasmid(
       plasmid_name   = input$new_plasmid_name,
       type           = input$new_plasmid_type,
       vector         = input$new_vector,
@@ -472,27 +404,22 @@ server <- function(input, output, session) {
       box_coordinate = input$new_box_coordinate,
       note           = input$new_plasmid_note,
       created_by     = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    ))
+    if (ok) { removeModal(); refresh() }
   })
 
-  observeEvent(input$add_plasmid_batch_btn, {
-    showModal(add_plasmid_batch_modal())
-  })
+  observeEvent(input$add_plasmid_batch_btn, { showModal(add_plasmid_batch_modal()) })
 
   observeEvent(input$save_plasmid_batch_btn, {
     req(selected_plasmid())
     if (is.null(input$new_plb_batch_name) || trimws(input$new_plb_batch_name) == "") {
-      showNotification("Batch name is required", type = "error")
-      return()
+      return(showNotification("Batch name is required", type = "error"))
     }
     if (!is.null(input$new_plb_concentration) &&
         !is.na(input$new_plb_concentration) && input$new_plb_concentration < 0) {
-      showNotification("Concentration must be a positive number", type = "error")
-      return()
+      return(showNotification("Concentration must be a positive number", type = "error"))
     }
-    insert_plasmid_batch(
+    ok <- safe_db(insert_plasmid_batch(
       plasmid_id         = selected_plasmid(),
       batch_id           = input$new_plb_batch_id,
       batch_name         = input$new_plb_batch_name,
@@ -524,9 +451,8 @@ server <- function(input, output, session) {
       qc_eln             = NULL,
       note               = input$new_plb_note,
       created_by         = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    ))
+    if (ok) { removeModal(); refresh() }
   })
 
   observeEvent(input$delete_plasmid_btn, {
@@ -535,27 +461,24 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$confirm_delete_plasmid_btn, {
-    delete_plasmid_cascade(selected_plasmid())
-    selected_plasmid(NULL)
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    if (safe_db(delete_plasmid_cascade(selected_plasmid()))) {
+      showNotification("Plasmid and its batches deleted", type = "message")
+      selected_plasmid(NULL)
+      removeModal()
+      refresh()
+    }
   })
 
-  # ══════════════════════════════════════════════════
-  # COMPONENTS
-  # ══════════════════════════════════════════════════
-
-  output$components_table <- renderDT({
-    refresh_trigger()
-    get_components()
-  }, selection = "single", rownames = FALSE)
+  output$components_table <- renderDT(components_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$components_table_rows_selected, {
-    rows <- input$components_table_rows_selected
-    if (length(rows)) {
-      data <- get_components()
-      selected_component(data$component_id[rows])
-    }
+    id <- selected_value(components_data(), input$components_table_rows_selected, "component_id")
+    if (!is.null(id)) selected_component(id)
+  })
+
+  selected_component_row <- reactive({
+    req(selected_component())
+    get_component_by_id(selected_component())
   })
 
   output$component_detail <- renderUI({
@@ -563,45 +486,25 @@ server <- function(input, output, session) {
     component_detail_ui(selected_component())
   })
 
-  output$comp_aa_seq <- renderText({
-    req(selected_component())
-    get_component_by_id(selected_component())$aa_sequence
-  })
+  output$comp_aa_seq   <- renderText(selected_component_row()$aa_sequence)
+  output$comp_cdna_seq <- renderText(selected_component_row()$cdna_sequence)
 
-  output$comp_cdna_seq <- renderText({
-    req(selected_component())
-    get_component_by_id(selected_component())$cdna_sequence
-  })
-
-  # ── Plasmids portal — selection only, no auto-navigate ──
-  output$component_plasmids_portal <- renderDT({
-    refresh_trigger()
-    req(selected_component())
-    get_plasmids_for_component(selected_component())
-  }, selection = "single", rownames = FALSE)
+  output$component_plasmids_portal <- renderDT(component_plasmids_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$view_plasmid_from_component_btn, {
-    req(selected_component())
-    rows <- input$component_plasmids_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_plasmids_for_component(selected_component())
-      selected_plasmid(linked$plasmid_id[rows])
-      updateNavbarPage(session, "navbar", selected = "Plasmids")
-    } else {
-      showNotification("Select a plasmid first", type = "warning")
-    }
+    id <- selected_value(component_plasmids_data(), input$component_plasmids_portal_rows_selected, "plasmid_id")
+    if (is.null(id)) return(showNotification("Select a plasmid first", type = "warning"))
+    selected_plasmid(id)
+    updateNavbarPage(session, "navbar", selected = "Plasmids")
   })
 
-  observeEvent(input$add_component_btn, {
-    showModal(add_component_modal())
-  })
+  observeEvent(input$add_component_btn, { showModal(add_component_modal()) })
 
   observeEvent(input$save_component_btn, {
     if (is.null(input$new_comp_name) || trimws(input$new_comp_name) == "") {
-      showNotification("Component name is required", type = "error")
-      return()
+      return(showNotification("Component name is required", type = "error"))
     }
-    insert_component(
+    ok <- safe_db(insert_component(
       component_name = input$new_comp_name,
       type           = input$new_comp_type,
       species        = input$new_comp_species,
@@ -619,9 +522,8 @@ server <- function(input, output, session) {
       seq_method     = input$new_comp_seq_method,
       note           = input$new_comp_note,
       created_by     = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    ))
+    if (ok) { removeModal(); refresh() }
   })
 
   observeEvent(input$delete_component_btn, {
@@ -630,27 +532,19 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$confirm_delete_component_btn, {
-    delete_component_cascade(selected_component())
-    selected_component(NULL)
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    if (safe_db(delete_component_cascade(selected_component()))) {
+      showNotification("Component deleted", type = "message")
+      selected_component(NULL)
+      removeModal()
+      refresh()
+    }
   })
 
-  # ══════════════════════════════════════════════════
-  # HYBRIDOMAS
-  # ══════════════════════════════════════════════════
-
-  output$hybridomas_table <- renderDT({
-    refresh_trigger()
-    get_hybridomas()
-  }, selection = "single", rownames = FALSE)
+  output$hybridomas_table <- renderDT(hybridomas_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$hybridomas_table_rows_selected, {
-    rows <- input$hybridomas_table_rows_selected
-    if (length(rows)) {
-      data <- get_hybridomas()
-      selected_hybridoma(data$hybridoma_id[rows])
-    }
+    id <- selected_value(hybridomas_data(), input$hybridomas_table_rows_selected, "hybridoma_id")
+    if (!is.null(id)) selected_hybridoma(id)
   })
 
   output$hybridoma_detail <- renderUI({
@@ -658,35 +552,22 @@ server <- function(input, output, session) {
     hybridoma_detail_ui(selected_hybridoma())
   })
 
-  # ── Components portal — selection only, no auto-navigate ──
-  output$hybridoma_components_portal <- renderDT({
-    refresh_trigger()
-    req(selected_hybridoma())
-    get_components_for_hybridoma(selected_hybridoma())
-  }, selection = "single", rownames = FALSE)
+  output$hybridoma_components_portal <- renderDT(hybridoma_components_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$view_component_from_hybridoma_btn, {
-    req(selected_hybridoma())
-    rows <- input$hybridoma_components_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_components_for_hybridoma(selected_hybridoma())
-      selected_component(linked$component_id[rows])
-      updateNavbarPage(session, "navbar", selected = "Components")
-    } else {
-      showNotification("Select a component first", type = "warning")
-    }
+    id <- selected_value(hybridoma_components_data(), input$hybridoma_components_portal_rows_selected, "component_id")
+    if (is.null(id)) return(showNotification("Select a component first", type = "warning"))
+    selected_component(id)
+    updateNavbarPage(session, "navbar", selected = "Components")
   })
 
-  observeEvent(input$add_hybridoma_btn, {
-    showModal(add_hybridoma_modal())
-  })
+  observeEvent(input$add_hybridoma_btn, { showModal(add_hybridoma_modal()) })
 
   observeEvent(input$save_hybridoma_btn, {
     if (is.null(input$new_hyb_clone_name) || trimws(input$new_hyb_clone_name) == "") {
-      showNotification("Clone name is required", type = "error")
-      return()
+      return(showNotification("Clone name is required", type = "error"))
     }
-    insert_hybridoma(
+    ok <- safe_db(insert_hybridoma(
       clone_name           = input$new_hyb_clone_name,
       mouse_igg_subclass   = input$new_hyb_subclass,
       light_chain_subclass = input$new_hyb_lc_subclass,
@@ -698,9 +579,8 @@ server <- function(input, output, session) {
       eln                  = input$new_hyb_eln,
       note                 = input$new_hyb_note,
       created_by           = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    ))
+    if (ok) { removeModal(); refresh() }
   })
 
   observeEvent(input$delete_hybridoma_btn, {
@@ -709,26 +589,20 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$confirm_delete_hybridoma_btn, {
-    delete_hybridoma(selected_hybridoma())
-    selected_hybridoma(NULL)
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    if (safe_db(delete_hybridoma(selected_hybridoma()))) {
+      showNotification("Hybridoma deleted", type = "message")
+      selected_hybridoma(NULL)
+      removeModal()
+      refresh()
+    }
   })
 
-  # ══════════════════════════════════════════════════
-  # CELL LINES
-  # ══════════════════════════════════════════════════
-
-  output$cell_lines_table <- renderDT({
-    refresh_trigger()
-    get_cell_lines()
-  }, selection = "single", rownames = FALSE)
+  output$cell_lines_table <- renderDT(cell_lines_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$cell_lines_table_rows_selected, {
-    rows <- input$cell_lines_table_rows_selected
-    if (length(rows)) {
-      data <- get_cell_lines()
-      selected_cell_line(data$cell_line_id[rows])
+    id <- selected_value(cell_lines_data(), input$cell_lines_table_rows_selected, "cell_line_id")
+    if (!is.null(id)) {
+      selected_cell_line(id)
       selected_cb(NULL)
     }
   })
@@ -738,18 +612,11 @@ server <- function(input, output, session) {
     cell_line_detail_ui(selected_cell_line())
   })
 
-  output$cell_batches_portal <- renderDT({
-    refresh_trigger()
-    req(selected_cell_line())
-    get_cell_batches(selected_cell_line())
-  }, selection = "single", rownames = FALSE)
+  output$cell_batches_portal <- renderDT(cell_batches_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$cell_batches_portal_rows_selected, {
-    rows <- input$cell_batches_portal_rows_selected
-    if (length(rows)) {
-      batches <- get_cell_batches(selected_cell_line())
-      selected_cb(batches$primary_key[rows])
-    }
+    id <- selected_value(cell_batches_data(), input$cell_batches_portal_rows_selected, "primary_key")
+    if (!is.null(id)) selected_cb(id)
   })
 
   output$cell_batch_detail <- renderUI({
@@ -757,9 +624,7 @@ server <- function(input, output, session) {
     cell_batch_detail_ui(selected_cb())
   })
 
-  observeEvent(input$back_to_cell_line_btn, {
-    selected_cb(NULL)
-  })
+  observeEvent(input$back_to_cell_line_btn, { selected_cb(NULL) })
 
   observeEvent(input$delete_cell_batch_btn, {
     req(selected_cb())
@@ -767,53 +632,40 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$confirm_delete_cell_batch_btn, {
-    delete_cell_batch(selected_cb())
-    selected_cb(NULL)
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    if (safe_db(delete_cell_batch(selected_cb()))) {
+      showNotification("Batch deleted", type = "message")
+      selected_cb(NULL)
+      removeModal()
+      refresh()
+    }
   })
 
-  # ── Plasmids portal — selection only, no auto-navigate ──
-  output$cell_line_plasmids_portal <- renderDT({
-    refresh_trigger()
-    req(selected_cell_line())
-    get_plasmids_for_cell_line(selected_cell_line())
-  }, selection = "single", rownames = FALSE)
+  output$cell_line_plasmids_portal <- renderDT(cell_line_plasmids_data(), selection = "single", rownames = FALSE)
 
   observeEvent(input$view_plasmid_from_cell_line_btn, {
-    req(selected_cell_line())
-    rows <- input$cell_line_plasmids_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_plasmids_for_cell_line(selected_cell_line())
-      selected_plasmid(linked$plasmid_id[rows])
-      updateNavbarPage(session, "navbar", selected = "Plasmids")
-    } else {
-      showNotification("Select a plasmid first", type = "warning")
-    }
+    id <- selected_value(cell_line_plasmids_data(), input$cell_line_plasmids_portal_rows_selected, "plasmid_id")
+    if (is.null(id)) return(showNotification("Select a plasmid first", type = "warning"))
+    selected_plasmid(id)
+    updateNavbarPage(session, "navbar", selected = "Plasmids")
   })
 
   observeEvent(input$unlink_plasmid_from_cell_line_btn, {
     req(selected_cell_line())
-    rows <- input$cell_line_plasmids_portal_rows_selected
-    if (length(rows)) {
-      linked <- get_plasmids_for_cell_line(selected_cell_line())
-      unlink_cell_line_plasmid(selected_cell_line(), linked$plasmid_id[rows])
-      refresh_trigger(refresh_trigger() + 1)
-    } else {
-      showNotification("Select a plasmid to unlink first", type = "warning")
+    id <- selected_value(cell_line_plasmids_data(), input$cell_line_plasmids_portal_rows_selected, "plasmid_id")
+    if (is.null(id)) return(showNotification("Select a plasmid to unlink first", type = "warning"))
+    if (safe_db(unlink_cell_line_plasmid(selected_cell_line(), id))) {
+      showNotification("Plasmid unlinked", type = "message")
+      refresh()
     }
   })
 
-  observeEvent(input$add_cell_line_btn, {
-    showModal(add_cell_line_modal())
-  })
+  observeEvent(input$add_cell_line_btn, { showModal(add_cell_line_modal()) })
 
   observeEvent(input$save_cell_line_btn, {
     if (is.null(input$new_cl_name) || trimws(input$new_cl_name) == "") {
-      showNotification("Cell line name is required", type = "error")
-      return()
+      return(showNotification("Cell line name is required", type = "error"))
     }
-    insert_cell_line(
+    ok <- safe_db(insert_cell_line(
       cell_line_name     = input$new_cl_name,
       expressed_orf      = input$new_cl_expressed_orf,
       cell_type          = input$new_cl_cell_type,
@@ -842,27 +694,22 @@ server <- function(input, output, session) {
       eln                = input$new_cl_eln,
       note               = input$new_cl_note,
       created_by         = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    ))
+    if (ok) { removeModal(); refresh() }
   })
 
-  observeEvent(input$add_cell_batch_btn, {
-    showModal(add_cell_batch_modal())
-  })
+  observeEvent(input$add_cell_batch_btn, { showModal(add_cell_batch_modal()) })
 
   observeEvent(input$save_cell_batch_btn, {
     req(selected_cell_line())
     if (is.null(input$new_cb_batch_id) || trimws(input$new_cb_batch_id) == "") {
-      showNotification("Batch ID is required", type = "error")
-      return()
+      return(showNotification("Batch ID is required", type = "error"))
     }
     if (!is.null(input$new_cb_vials) &&
         !is.na(input$new_cb_vials) && input$new_cb_vials < 0) {
-      showNotification("Vials must be a positive number", type = "error")
-      return()
+      return(showNotification("Vials must be a positive number", type = "error"))
     }
-    insert_cell_batch(
+    ok <- safe_db(insert_cell_batch(
       cell_line_id = selected_cell_line(),
       batch_id     = input$new_cb_batch_id,
       date         = input$new_cb_date,
@@ -874,9 +721,8 @@ server <- function(input, output, session) {
       storage_box  = input$new_cb_storage_box,
       passage_num  = input$new_cb_passage_num,
       created_by   = "user"
-    )
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    ))
+    if (ok) { removeModal(); refresh() }
   })
 
   observeEvent(input$delete_cell_line_btn, {
@@ -885,15 +731,21 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$confirm_delete_cell_line_btn, {
-    delete_cell_line_cascade(selected_cell_line())
-    selected_cell_line(NULL)
-    removeModal()
-    refresh_trigger(refresh_trigger() + 1)
+    if (safe_db(delete_cell_line_cascade(selected_cell_line()))) {
+      showNotification("Cell line and its batches deleted", type = "message")
+      selected_cell_line(NULL)
+      removeModal()
+      refresh()
+    }
   })
 
-  # ══════════════════════════════════════════════════
-  # ANALYTICS
-  # ══════════════════════════════════════════════════
+  active_chart <- reactiveVal("concentration_trend")
+
+  observe({
+    proteins <- proteins_data()
+    updateSelectInput(session, "analytics_protein_filter",
+      choices = c("All" = "all", setNames(proteins$protein_id, proteins$protein_name)))
+  })
 
   observeEvent(input$show_conc_trend,   { active_chart("concentration_trend") })
   observeEvent(input$show_purity_trend, { active_chart("purity_trend") })
@@ -901,6 +753,7 @@ server <- function(input, output, session) {
   observeEvent(input$show_yield_dist,   { active_chart("yield_distribution") })
 
   output$analytics_plot <- renderPlotly({
+    refresh_trigger()
     pid <- input$analytics_protein_filter
     switch(active_chart(),
       "concentration_trend" = plot_concentration_trend(pid),
@@ -910,31 +763,15 @@ server <- function(input, output, session) {
     )
   })
 
-  stats <- reactive({
-    refresh_trigger()
-    get_overview_stats()
-  })
+  stats <- reactive({ refresh_trigger(); get_overview_stats() })
 
-  output$stat_proteins  <- renderText({ stats()$total_proteins })
-  output$stat_batches   <- renderText({ stats()$total_batches })
-  output$stat_avg_conc  <- renderText({
-    paste(stats()$avg_concentration, "mg/mL")
-  })
-  output$stat_avg_purity <- renderText({
-    paste(stats()$avg_purity, "%")
-  })
+  output$stat_proteins   <- renderText(stats()$total_proteins)
+  output$stat_batches    <- renderText(stats()$total_batches)
+  output$stat_avg_conc   <- renderText(paste(stats()$avg_concentration, "mg/mL"))
+  output$stat_avg_purity <- renderText(paste(stats()$avg_purity, "%"))
 
-  output$plot_batch_count <- renderPlotly({
-    refresh_trigger()
-    plot_batch_count()
-  })
+  output$plot_batch_count       <- renderPlotly({ refresh_trigger(); plot_batch_count() })
+  output$plot_source_comparison <- renderPlotly({ refresh_trigger(); plot_source_comparison() })
 
-  output$plot_source_comparison <- renderPlotly({
-    refresh_trigger()
-    plot_source_comparison()
-  })
-
-  output$recent_batches_table <- renderDT({
-    stats()$recent_batches
-  }, rownames = FALSE, options = list(dom = "t"))
+  output$recent_batches_table <- renderDT(stats()$recent_batches, rownames = FALSE, options = list(dom = "t"))
 }

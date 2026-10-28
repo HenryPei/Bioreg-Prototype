@@ -3,19 +3,16 @@ ui <- navbarPage(
   title = "Bioregistration Prototype",
   theme = bs_theme(version = 5, bootswatch = "flatly"),
 
-  # Catalogue
   navbarMenu("Catalogue",
     tabPanel("Proteins",
       fluidRow(
         column(12,
           br(),
-          actionButton("add_protein_btn", "Add Protein",
-            class = "btn-primary btn-sm"),
+          actionButton("add_protein_btn", "Add Protein", class = "btn-primary btn-sm"),
           br(), br(),
           DTOutput("proteins_table"),
           hr(),
-          uiOutput("protein_detail"),
-          uiOutput("protein_batch_detail")
+          uiOutput("protein_detail")
         )
       )
     ),
@@ -24,8 +21,7 @@ ui <- navbarPage(
       fluidRow(
         column(12,
           br(),
-          actionButton("add_component_btn", "Add Component",
-            class = "btn-primary btn-sm"),
+          actionButton("add_component_btn", "Add Component", class = "btn-primary btn-sm"),
           br(), br(),
           DTOutput("components_table"),
           hr(),
@@ -38,8 +34,7 @@ ui <- navbarPage(
       fluidRow(
         column(12,
           br(),
-          actionButton("add_plasmid_btn", "Add Plasmid",
-            class = "btn-primary btn-sm"),
+          actionButton("add_plasmid_btn", "Add Plasmid", class = "btn-primary btn-sm"),
           br(), br(),
           DTOutput("plasmids_table"),
           hr(),
@@ -52,8 +47,7 @@ ui <- navbarPage(
       fluidRow(
         column(12,
           br(),
-          actionButton("add_hybridoma_btn", "Add Hybridoma",
-            class = "btn-primary btn-sm"),
+          actionButton("add_hybridoma_btn", "Add Hybridoma", class = "btn-primary btn-sm"),
           br(), br(),
           DTOutput("hybridomas_table"),
           hr(),
@@ -66,8 +60,7 @@ ui <- navbarPage(
       fluidRow(
         column(12,
           br(),
-          actionButton("add_cell_line_btn", "Add Cell Line",
-            class = "btn-primary btn-sm"),
+          actionButton("add_cell_line_btn", "Add Cell Line", class = "btn-primary btn-sm"),
           br(), br(),
           DTOutput("cell_lines_table"),
           hr(),
@@ -77,7 +70,6 @@ ui <- navbarPage(
     )
   ),
 
-  # ── Analytics ─────────────────────────────────────
   navbarMenu("Analytics",
 
     tabPanel("Overview",
@@ -93,11 +85,11 @@ ui <- navbarPage(
         )),
         column(3, wellPanel(
           h3(textOutput("stat_avg_conc")),
-          p("Avg concentration mg/mL", style = "color:gray")
+          p("Avg concentration", style = "color:gray")
         )),
         column(3, wellPanel(
           h3(textOutput("stat_avg_purity")),
-          p("Avg SEC purity %", style = "color:gray")
+          p("Avg SEC purity", style = "color:gray")
         ))
       ),
       fluidRow(
@@ -117,21 +109,17 @@ ui <- navbarPage(
       br(),
       fluidRow(
         column(3,
-          selectInput("analytics_protein_filter", "Filter by protein",
-            choices = NULL),
+          selectInput("analytics_protein_filter", "Filter by protein", choices = NULL),
           hr(),
           h6("Select a chart:"),
           actionButton("show_conc_trend", "Concentration trend",
-            class = "btn-outline-primary btn-sm btn-block"),
-          br(),
+            class = "btn-outline-primary btn-sm w-100 mb-2"),
           actionButton("show_purity_trend", "Purity trend",
-            class = "btn-outline-primary btn-sm btn-block"),
-          br(),
+            class = "btn-outline-primary btn-sm w-100 mb-2"),
           actionButton("show_conc_purity", "Concentration vs purity",
-            class = "btn-outline-primary btn-sm btn-block"),
-          br(),
+            class = "btn-outline-primary btn-sm w-100 mb-2"),
           actionButton("show_yield_dist", "Yield distribution",
-            class = "btn-outline-primary btn-sm btn-block")
+            class = "btn-outline-primary btn-sm w-100")
         ),
         column(9,
           plotlyOutput("analytics_plot", height = "500px")

@@ -1,21 +1,18 @@
-# TABLE OF CONTENTS
 # protein.R
-# ─────────────────────────────────────────────────────
-# get_proteins()                  — all proteins for display table
-# get_protein_by_id()             — single protein for detail view
-# get_next_protein_id()           — generates next B-XXXXXXX ID
-# insert_protein()                — writes new protein to database
-# delete_protein_cascade()        — deletes protein and all dependent records
-# get_plasmids_for_protein()      — plasmids linked to this protein via join table
-# protein_detail_ui()             — detail panel with batch and plasmid portals
-# add_protein_modal()             — popup form for adding a new protein
-# delete_protein_confirm_modal()  — confirmation popup before cascading delete
+# get_proteins()                  all proteins for the table
+# get_protein_by_id()             one protein for the detail view
+# get_next_protein_id()           next B-XXXXXXX id
+# insert_protein()                add a protein
+# delete_protein_cascade()        delete a protein, its batches and links
+# get_plasmids_for_protein()      plasmids linked to a protein
+# protein_detail_ui()             detail panel with batch and plasmid portals
+# add_protein_modal()             add protein form
+# delete_protein_confirm_modal()  confirm before delete
 
-# ── Protein - Database queries
 get_proteins <- function() {
   dbGetQuery(con,
     "SELECT protein_id, protein_name, type, hc_type, lc_type,
-             alias, project_code, cro, created_at
+            alias, project_code, cro, created_at
      FROM protein
      ORDER BY created_at DESC")
 }
@@ -28,10 +25,9 @@ get_protein_by_id <- function(protein_id) {
 
 get_next_protein_id <- function() {
   last <- dbGetQuery(con,
-    "SELECT protein_id FROM protein
-     ORDER BY protein_id DESC LIMIT 1")
+    "SELECT protein_id FROM protein ORDER BY protein_id DESC LIMIT 1")
   if (nrow(last) == 0) return("B-0000001")
-  num <- as.integer(gsub("B-", "", last$protein_id)) + 1
+  num <- as.integer(sub("B-", "", last$protein_id)) + 1
   sprintf("B-%07d", num)
 }
 
@@ -40,54 +36,49 @@ insert_protein <- function(protein_name, clone_id, type, hc_type,
                            nbl_id, reference_name, vendor, catalog_num,
                            dotmatics_id, stoichiometry, pi, a280_1mgml,
                            mw, source_cell, note, created_by) {
-  tryCatch({
-    dbExecute(con,
-      "INSERT INTO protein (protein_id, protein_name, clone_id, type,
-                            hc_type, lc_type, alias, project_code, cro,
-                            cro_id, nbl_id, reference_name, vendor,
-                            catalog_num, dotmatics_id, stoichiometry,
-                            pi, a280_1mgml, mw, source_cell, note,
-                            created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-               $16,$17,$18,$19,$20,$21,$22)",
-      params = list(get_next_protein_id(), protein_name, clone_id, type,
-                    hc_type, lc_type, alias, project_code, cro, cro_id,
-                    nbl_id, reference_name, vendor, catalog_num,
-                    dotmatics_id, stoichiometry, pi, a280_1mgml, mw,
-                    source_cell, note, created_by))
-  }, error = function(e) {
-    showNotification(paste("Error saving protein:", e$message), type = "error")
-  })
+  params <- lapply(list(
+    get_next_protein_id(), protein_name, clone_id, type, hc_type, lc_type,
+    alias, project_code, cro, cro_id, nbl_id, reference_name, vendor,
+    catalog_num, dotmatics_id, stoichiometry, pi, a280_1mgml, mw,
+    source_cell, note, created_by
+  ), blank_to_na)
+
+  dbExecute(con,
+    "INSERT INTO protein (protein_id, protein_name, clone_id, type,
+                          hc_type, lc_type, alias, project_code, cro,
+                          cro_id, nbl_id, reference_name, vendor,
+                          catalog_num, dotmatics_id, stoichiometry,
+                          pi, a280_1mgml, mw, source_cell, note, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+             $16,$17,$18,$19,$20,$21,$22)",
+    params = params)
 }
 
 delete_protein_cascade <- function(protein_id) {
-  tryCatch({
-    dbExecute(con, "DELETE FROM protein_batch WHERE protein_id = $1",
+  poolWithTransaction(con, function(conn) {
+    dbExecute(conn, "DELETE FROM protein_batch WHERE protein_id = $1",
       params = list(protein_id))
-    dbExecute(con, "DELETE FROM join_table_protein_plasmid WHERE protein_id = $1",
+    dbExecute(conn, "DELETE FROM join_table_protein_plasmid WHERE protein_id = $1",
       params = list(protein_id))
-    dbExecute(con, "DELETE FROM protein WHERE protein_id = $1",
+    dbExecute(conn, "DELETE FROM protein WHERE protein_id = $1",
       params = list(protein_id))
-    showNotification("Protein and all associated records deleted", type = "message")
-  }, error = function(e) {
-    showNotification(paste("Error deleting protein:", e$message), type = "error")
   })
 }
 
 get_plasmids_for_protein <- function(protein_id) {
   dbGetQuery(con,
-    "SELECT p.plasmid_id, p.plasmid_name, p.type, p.vector,
-             jpp.pnr_number
+    "SELECT p.plasmid_id, p.plasmid_name, p.type, p.vector, jpp.pnr_number
      FROM plasmid p
      JOIN join_table_protein_plasmid jpp ON p.plasmid_id = jpp.plasmid_id
      WHERE jpp.protein_id = $1",
     params = list(protein_id))
 }
 
-# ── Protein - catalogue functions
+# ui
+
 protein_detail_ui <- function(protein_id) {
   protein <- get_protein_by_id(protein_id)
-  
+
   tagList(
     hr(),
     card(
@@ -104,36 +95,30 @@ protein_detail_ui <- function(protein_id) {
       p(strong("A280: "), protein$a280_1mgml),
       p(strong("Source Cell: "), protein$source_cell),
       p(strong("Note: "), protein$note),
-      actionButton("delete_protein_btn", "Delete Protein",
-        class = "btn-danger btn-sm")
+      actionButton("delete_protein_btn", "Delete Protein", class = "btn-danger btn-sm")
     ),
     br(),
-    
+
     card(
       card_header("Batches"),
-      actionButton("add_protein_batch_btn", "Add Batch",
-        class = "btn-success btn-sm"),
+      actionButton("add_protein_batch_btn", "Add Batch", class = "btn-success btn-sm"),
       DTOutput("protein_batches_portal")
     ),
     br(),
-    
+
     card(
       card_header("Plasmids"),
-      actionButton("link_plasmid_btn", "Link",
-        class = "btn-primary btn-sm"),
-      actionButton("view_plasmid_btn", "View Selected",
-        class = "btn-outline-primary btn-sm"),
-      actionButton("unlink_plasmid_btn", "Unlink Selected",
-        class = "btn-warning btn-sm"),
+      actionButton("link_plasmid_btn", "Link", class = "btn-primary btn-sm"),
+      actionButton("view_plasmid_btn", "View Selected", class = "btn-outline-primary btn-sm"),
+      actionButton("unlink_plasmid_btn", "Unlink Selected", class = "btn-warning btn-sm"),
       DTOutput("protein_plasmids_portal")
     ),
     br(),
-    
+
     uiOutput("protein_batch_detail")
   )
 }
 
-# ── Add protein modal ─────────────────────────────────
 add_protein_modal <- function() {
   modalDialog(
     title = "Add New Protein",
@@ -178,18 +163,16 @@ add_protein_modal <- function() {
   )
 }
 
-# ── Delete confirmation modal ─────────────────────────
 delete_protein_confirm_modal <- function(protein_id) {
   protein  <- get_protein_by_id(protein_id)
   batches  <- get_protein_batches(protein_id)
   plasmids <- get_plasmids_for_protein(protein_id)
 
-  warning_text <- paste0("Delete ", protein$protein_name, "? This will also delete ",
-    nrow(batches), " batch(es). ")
+  warning_text <- paste0("Delete ", protein$protein_name,
+    "? This will also delete ", nrow(batches), " batch(es). ")
 
   if (nrow(plasmids) > 0) {
-    warning_text <- paste0(warning_text,
-      "This protein will be unlinked from: ",
+    warning_text <- paste0(warning_text, "This protein will be unlinked from: ",
       format_relationship_list(plasmids$plasmid_name), ". ")
   }
 
@@ -200,8 +183,7 @@ delete_protein_confirm_modal <- function(protein_id) {
     warning_text,
     footer = tagList(
       modalButton("Cancel"),
-      actionButton("confirm_delete_protein_btn", "Delete Everything",
-        class = "btn-danger")
+      actionButton("confirm_delete_protein_btn", "Delete Everything", class = "btn-danger")
     )
   )
 }

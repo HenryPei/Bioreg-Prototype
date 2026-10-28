@@ -1,15 +1,12 @@
-# TABLE OF CONTENTS
 # plasmid_batch.R
-# ─────────────────────────────────────────────────────
-# get_plasmid_batches()                — all batches for a plasmid, for portal display
-# get_plasmid_batch_by_id()            — single batch for detail view
-# insert_plasmid_batch()               — writes new batch to database
-# delete_plasmid_batch()               — deletes a plasmid batch record
-# plasmid_batch_detail_ui()            — detail panel with batch fields and back button
-# add_plasmid_batch_modal()            — popup form for adding a new batch
-# delete_plasmid_batch_confirm_modal() — confirmation popup before delete
+# get_plasmid_batches()                 batches for a plasmid
+# get_plasmid_batch_by_id()             one batch for the detail view
+# insert_plasmid_batch()                add a batch
+# delete_plasmid_batch()                delete a batch
+# plasmid_batch_detail_ui()             batch detail panel
+# add_plasmid_batch_modal()             add batch form
+# delete_plasmid_batch_confirm_modal()  confirm before delete
 
-# ── Plasmid batch - Database queries
 get_plasmid_batches <- function(plasmid_id) {
   dbGetQuery(con,
     "SELECT primary_key, batch_id, batch_name, concentration, unit,
@@ -37,7 +34,6 @@ insert_plasmid_batch <- function(plasmid_id, batch_id, batch_name,
                                   starting_inventory, current_inventory,
                                   tube_volumes, confirmed_by, qc_eln,
                                   note, created_by) {
-  tryCatch({
   dbExecute(con,
     "INSERT INTO plasmid_batch (plasmid_id, batch_id, batch_name,
                                 concentration, unit, yield_ug,
@@ -53,29 +49,20 @@ insert_plasmid_batch <- function(plasmid_id, batch_id, batch_name,
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
              $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,
              $29,$30,$31)",
-    params = list(plasmid_id, batch_id, batch_name, concentration,
+    params = lapply(list(plasmid_id, batch_id, batch_name, concentration,
                   unit, yield_ug, buffer_solution, source, storage,
                   room, storage_unit, shelf, rack, storage_box,
                   production_date, a260_to_280, a260_to_230, endotoxin,
                   cro, cro_id, prep, seq_confirm, vol_ml, initial_vol_ul,
                   starting_inventory, current_inventory, tube_volumes,
-                  confirmed_by, qc_eln, note, created_by))
-  }, error = function(e) {
-    showNotification(paste("Error saving plasmid batch:", e$message), type = "error")
-  })
+                  confirmed_by, qc_eln, note, created_by), blank_to_na))
 }
 
 delete_plasmid_batch <- function(primary_key) {
-  tryCatch({
-    dbExecute(con, "DELETE FROM plasmid_batch WHERE primary_key = $1",
-      params = list(primary_key))
-    showNotification("Plasmid batch deleted", type = "message")
-  }, error = function(e) {
-    showNotification(paste("Error deleting plasmid batch:", e$message), type = "error")
-  })
+  dbExecute(con, "DELETE FROM plasmid_batch WHERE primary_key = $1",
+    params = list(primary_key))
 }
 
-# ── Plasmid batch - catalogue functions
 plasmid_batch_detail_ui <- function(primary_key) {
   batch <- get_plasmid_batch_by_id(primary_key)
   
@@ -114,7 +101,6 @@ plasmid_batch_detail_ui <- function(primary_key) {
   )
 }
 
-# ── Add plasmid batch modal ───────────────────────────
 add_plasmid_batch_modal <- function() {
   modalDialog(
     title = "Add Plasmid Batch",
@@ -140,7 +126,7 @@ add_plasmid_batch_modal <- function() {
       column(6, textInput("new_plb_seq_confirm", "Seq Confirm"))
     ),
     fluidRow(
-      column(6, dateInput("new_plb_production_date", "Production Date")),
+      column(6, dateInput("new_plb_production_date", "Production Date", value = NA)),
       column(6, textInput("new_plb_prep", "Prep"))
     ),
     fluidRow(
@@ -166,7 +152,6 @@ add_plasmid_batch_modal <- function() {
   )
 }
 
-# ── Delete confirmation modal ─────────────────────────
 delete_plasmid_batch_confirm_modal <- function(primary_key) {
   batch <- get_plasmid_batch_by_id(primary_key)
   
