@@ -35,5 +35,5 @@ blank_to_na <- function(x) {
 }
 
 form_value <- function(row, col) {
-  if (is.null(row) || is.null(row[[col]] || is.na(row[[col]]))) "" else as.character(row[[col]])
+  if (is.null(row) || is.null(row[[col]]) || is.na(row[[col]])) "" else as.character(row[[col]])
 }
